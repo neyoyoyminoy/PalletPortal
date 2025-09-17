@@ -41,10 +41,19 @@ class MainWindow(QStackedWidget):
         self.setCurrentIndex(0)  # Start on Welcome
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_A:  # left
+        key = event.key()
+        if key == Qt.Key_A:  # left
             self.setCurrentIndex((self.currentIndex() - 1) % self.count())
-        elif event.key() == Qt.Key_F:  # right
+        elif key == Qt.Key_F:  # right
             self.setCurrentIndex((self.currentIndex() + 1) % self.count())
-        elif event.key() == Qt.Key_S:  # select
+        elif key == Qt.Key_S:  # select
             self.setCurrentIndex(1)  # Jump to ModeScreen
-        elif event.key() ==
+        elif key == Qt.Key_D:  # cancel
+            self.setCurrentIndex(0)  # Return to Welcome
+
+# --- App Startup ---
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.showFullScreen()
+    sys.exit(app.exec_())
