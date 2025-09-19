@@ -7,61 +7,48 @@ using pyqt to make a gui for our pallet portal project
 '''
 
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
+from PyQt5.QtGui import QFont #imports font library
+from PyQt5.QtGui import QIcon #lets the GUI have a window icon
+from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
 
-'''welcome screen'''
-class welcomeScreen(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        title = QLabel("Welcome")
-        subtitle = QLabel("Insert flashdrive to begin")
-        title.setAlignment(Qt.AlignCenter)
-        subtitle.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        self.setLayout(layout)
+class mainWindow(QMainWindow):
+  def __init__(self):
+    super().__init__()
+    self.setWindowTitle("PalletPortal 1.0")
+    self.setGeomerty(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
+    self.setWindowIcon(QIcon('colorLogo.jpg'))
 
-'''mode selection screen'''
-class ModeScreen(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        title = QLabel("Select Mode")
-        ship = QLabel("Ship Mode")
-        view = QLabel("View Order")
-        title.setAlignment(Qt.AlignCenter)
-        ship.setAlignment(Qt.AlignCenter)
-        view.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-        layout.addWidget(ship)
-        layout.addWidget(view)
-        self.setLayout(layout)
+    label = QLabel("Welcome", self) #main label
+    label.setFont(QFont('Beausite Classic', 40)) #sets font type and size
+    label.setStyleSheet("color: #0c2340;"
+                        "background-color: #f15a22;"
+                        "font-weight: bold;"
+                        "font-style: italic;"
+                        "text-decoration: underline;") #this is in hexedecimal although you can put basic color names instead; css like properties; properties should end with ';'
+    '''
+    label.setAlignment(Qt.AlignTop) #aligns vertically to the top
+    label.setAlignment(Qt.AlignBottom)  #aligns on the bottom
+    label.setAlignment(Qt.AlignVCenter) #aligns vertically center
+    label.setAlignment(Qt.AlignRight) #aligns horizontally right
+    label.setAlignment(Qt.AlignHCenter) #aligns hoizontally center
+    label.setAlignment(Qt.AlignLeft) #aligns horizontally left
+    label.setAlignment(Qt.AlignCenter | Qt.AlignTop) #aligns horizontally and vertically center
+    '''
+    label.setAlignment(Qt.AlignCenter) #aligns horizontally and vertically center
 
-'''key navigation'''
-class mainWindow(QStackedWidget):
-    def __init__(self):
-        super().__init__()
-        self.screens = [WelcomeScreen(), ModeScreen()]
-        for s in self.screens:
-            self.addWidget(s)
-        self.setCurrentIndex(0)  # Start on Welcome
+    self.setCentralWidget(label)
 
-    def keyPressEvent(self, event):
-        key = event.key()
-        if key == Qt.Key_A:  # left
-            self.setCurrentIndex((self.currentIndex() - 1) % self.count())
-        elif key == Qt.Key_F:  # right
-            self.setCurrentIndex((self.currentIndex() + 1) % self.count())
-        elif key == Qt.Key_S:  # select
-            self.setCurrentIndex(1)  # Jump to ModeScreen
-        elif key == Qt.Key_D:  # cancel
-            self.setCurrentIndex(0)  # Return to Welcome
+    '''
+    self.ui = Ui_MainWindow()
+    self.ui.setupUi(self)
+    '''
 
-'''startup'''
+def main():
+  app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
+  window = mainWindow() #default behavior for a window is to hide it
+  window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
+  sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
+
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.showFullScreen()
-    sys.exit(app.exec_())
+  main()
