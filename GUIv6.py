@@ -8,15 +8,15 @@ this version implements multiple 'dummy' pages
 '''
 
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtGui import QFont #imports font library
 from PyQt5.QtGui import QIcon #lets the GUI have a window icon
 from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
 
-class mainWindow(QMainWindow):
+class mainWindow(QWidget):
   def __init__(self):
     super().__init__()
-    self.setWindowTitle("PalletPortal 1.0")
+    self.setWindowTitle("PalletPortal 1.0")  #sets window title
     self.setGeometry(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
     
     layout = QVBoxLayout()  #this class is used to construct vertical box layout objects
