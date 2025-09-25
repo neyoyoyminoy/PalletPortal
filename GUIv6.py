@@ -8,12 +8,11 @@ this version implements multiple 'dummy' pages
 '''
 
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtGui import QFont #imports font library
-from PyQt5.QtGui import QIcon #lets the GUI have a window icon
 from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
 
-class mainWindow(QWidget):
+class welcomeScreen(QWidget):
   def __init__(self):
     super().__init__()
     self.setWindowTitle("PalletPortal 1.0")  #sets window title
