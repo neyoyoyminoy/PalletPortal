@@ -8,7 +8,7 @@ this version implements multiple 'dummy' pages
 '''
 
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, 
 from PyQt5.QtGui import QFont #imports font library
 from PyQt5.QtGui import QIcon #lets the GUI have a window icon
 from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
