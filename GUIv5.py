@@ -16,7 +16,8 @@ class mainWindow(QMainWindow):
   def __init__(self):
     super().__init__()
     self.setWindowTitle("PalletPortal 1.0")
-    self.setGeometry(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
+    self.resize(1024, 600)
+    self.move(100, 100)
     self.setWindowIcon(QIcon('colorLogo.jpg'))
 
     '''welcome label'''
@@ -29,7 +30,7 @@ class mainWindow(QMainWindow):
     '''welcome dropshadow'''
     shadow = QGraphicsDropShadowEffect()
     shadow.setBlurRadius(0) #sets sharp edges
-    shadow.setOffset(3, 3) #moves in x & y direction
+    shadow.setOffset(0, 0) #moves in x & y direction
     shadow.setColor(Qt.white) #white dropshadow
 
     label.setGraphicsEffect(shadow)
