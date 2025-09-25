@@ -6,37 +6,44 @@ using pyqt to make a gui for our pallet portal project
 
 '''
 
-import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGraphicsDropShadowEffect
-from PyQt5.QtGui import QFont #imports font library
-from PyQt5.QtGui import QIcon #lets the GUI have a window icon
-from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGraphicsDropShadowEffect, QWidget, QVBoxLayout
+from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtCore import Qt
 
 class mainWindow(QMainWindow):
-  def __init__(self):
-    super().__init__()
-    self.setWindowTitle("PalletPortal 1.0")
-    self.resize(1024, 600)
-    self.move(100, 100)
-    self.setWindowIcon(QIcon('colorLogo.jpg'))
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("PalletPortal 1.0")
+        self.resize(1024, 600)
+        self.move(100, 100)
+        self.setWindowIcon(QIcon('colorLogo.jpg'))
 
-    '''welcome label'''
-    label = QLabel("Welcome", self) #main label
-    label.setFont(QFont('Beausite Classic', 40)) #sets font type and size
-    label.setStyleSheet("color: #0c2340;"
-                        "background-color: #f15a22;"
-                        "font-weight: bold;") #this is in hexedecimal although you can put basic color names instead; css like properties; properties should end with ';'
+        # central widget + layout
+        central_widget = QWidget(self)
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout()
+        central_widget.setLayout(layout)
 
-    '''welcome dropshadow'''
-    shadow = QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(0) #sets sharp edges
-    shadow.setOffset(0, 0) #moves in x & y direction
-    shadow.setColor(Qt.white) #white dropshadow
+        # welcome label
+        label = QLabel("Welcome")
+        label.setFont(QFont('Beausite Classic', 40))
+        label.setStyleSheet(
+            "color: #0c2340;"
+            "background-color: #f15a22;"
+            "font-weight: bold;"
+        )
+        label.setAlignment(Qt.AlignCenter)
 
-    label.setGraphicsEffect(shadow)
-    label.show()
+        # drop shadow
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(0)
+        shadow.setOffset(0, 0)
+        shadow.setColor(Qt.white)
+        label.setGraphicsEffect(shadow)
 
-    label.setAlignment(Qt.AlignCenter) #aligns horizontally and vertically center
+        # add to layout (this will center it automatically)
+        layout.addWidget(label, alignment=Qt.AlignCenter)
+
 
 def main():
   app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
