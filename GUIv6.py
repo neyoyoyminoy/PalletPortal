@@ -17,7 +17,7 @@ class mainWindow(QMainWindow):
   def __init__(self):
     super().__init__()
     self.setWindowTitle("PalletPortal 1.0")
-    self.setGeomerty(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
+    self.setGeometry(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
     
     layout = QVBoxLayout()  #this class is used to construct vertical box layout objects
     title = QLabel("Welcome")
