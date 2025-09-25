@@ -25,22 +25,22 @@ class mainWindow(QMainWindow):
         layout = QVBoxLayout()
         central_widget.setLayout(layout)
 
-        # Welcome label
-        label = QLabel("Welcome")
-        label.setFont(QFont('Beausite Classic', 40))
+        # Set background of entire window
+        central_widget.setStyleSheet("background-color: #f15a22;")
+
+        # Welcome label styling (no solid box background)
         label.setStyleSheet(
             "color: #0c2340;"
-            "background-color: #f15a22;"
             "font-weight: bold;"
-        )
-        label.setAlignment(Qt.AlignCenter)
+            "background-color: transparent;")
 
-        # Drop shadow
+        # Drop shadow (visible and slightly offset)
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(0)
-        shadow.setOffset(0, 0)  # keeps shadow centered
+        shadow.setBlurRadius(8)   # make it soft
+        shadow.setOffset(3, 3)    # shift slightly down/right
         shadow.setColor(Qt.white)
         label.setGraphicsEffect(shadow)
+
 
         # Add to layout so it's centered in the window
         layout.addWidget(label, alignment=Qt.AlignCenter)
