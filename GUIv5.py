@@ -6,6 +6,7 @@ using pyqt to make a gui for our pallet portal project
 
 '''
 
+import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGraphicsDropShadowEffect, QWidget, QVBoxLayout
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtCore import Qt
@@ -18,13 +19,13 @@ class mainWindow(QMainWindow):
         self.move(100, 100)
         self.setWindowIcon(QIcon('colorLogo.jpg'))
 
-        # central widget + layout
+        # Central widget and layout
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout()
         central_widget.setLayout(layout)
 
-        # welcome label
+        # Welcome label
         label = QLabel("Welcome")
         label.setFont(QFont('Beausite Classic', 40))
         label.setStyleSheet(
@@ -34,22 +35,22 @@ class mainWindow(QMainWindow):
         )
         label.setAlignment(Qt.AlignCenter)
 
-        # drop shadow
+        # Drop shadow
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(0)
-        shadow.setOffset(0, 0)
+        shadow.setOffset(0, 0)  # keeps shadow centered
         shadow.setColor(Qt.white)
         label.setGraphicsEffect(shadow)
 
-        # add to layout (this will center it automatically)
+        # Add to layout so it's centered in the window
         layout.addWidget(label, alignment=Qt.AlignCenter)
 
-
 def main():
-  app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
-  window = mainWindow() #default behavior for a window is to hide it
-  window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
-  sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
+    app = QApplication(sys.argv)
+    window = mainWindow()
+    window.show()
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
-  main()
+    main()
+
