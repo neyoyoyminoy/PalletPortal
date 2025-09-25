@@ -39,30 +39,12 @@ class mainWindow(QMainWindow):
     layout.addWidget(title)
     layout.addWidget(subtitle)
     self.setLayout(layout)
-    self.setCentralWidget(title)
     
-    '''
-    label.setAlignment(Qt.AlignTop) #aligns vertically to the top
-    label.setAlignment(Qt.AlignBottom)  #aligns on the bottom
-    label.setAlignment(Qt.AlignVCenter) #aligns vertically center
-    label.setAlignment(Qt.AlignRight) #aligns horizontally right
-    label.setAlignment(Qt.AlignHCenter) #aligns hoizontally center
-    label.setAlignment(Qt.AlignLeft) #aligns horizontally left
-    label.setAlignment(Qt.AlignCenter | Qt.AlignTop) #aligns horizontally and vertically center
-    '''
-    
-    '''
-    self.ui = Ui_MainWindow()
-    self.ui.setupUi(self)
-    '''
 
 def main():
   app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
   window = mainWindow() #default behavior for a window is to hide it
   window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
-  '''
-  window.showFullScreen() #this will show the gui in fullscreen
-  '''
   sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
 
 if __name__ == "__main__":
