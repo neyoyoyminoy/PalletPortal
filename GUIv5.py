@@ -34,7 +34,7 @@ class mainWindow(QMainWindow):
     shadow.setColor(Qt.white) #white dropshadow
 
     label.setGraphicsEffect(shadow)
-    labbel.show()
+    label.show()
 
     label.setAlignment(Qt.AlignCenter) #aligns horizontally and vertically center
 
