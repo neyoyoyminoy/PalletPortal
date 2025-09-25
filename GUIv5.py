@@ -29,7 +29,7 @@ class mainWindow(QMainWindow):
         central_widget.setStyleSheet("background-color: #f15a22;")
 
         # Welcome label styling (no solid box background)
-        label.setStyleSheet(
+        Qlabel.setStyleSheet(
             "color: #0c2340;"
             "font-weight: bold;"
             "background-color: transparent;")
