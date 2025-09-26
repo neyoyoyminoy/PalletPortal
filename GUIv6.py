@@ -8,7 +8,7 @@ this version implements multiple 'dummy' pages
 '''
 
 import sys
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
 from PyQt5.QtGui import QFont #imports font library
 from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
 
@@ -38,13 +38,10 @@ class welcomeScreen(QWidget):
     layout.addWidget(title)
     layout.addWidget(subtitle)
     self.setLayout(layout)
-    
 
-def main():
+
+if __name__ == "__main__":
   app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
   window = mainWindow() #default behavior for a window is to hide it
   window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
   sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
-
-if __name__ == "__main__":
-  main()
