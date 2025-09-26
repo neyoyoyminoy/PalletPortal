@@ -1,47 +1,123 @@
-'''
-Brendan Nellis  ujf306
-Design 2  Fall 2025
-
-this verison is a iteration of GIUv3 since v4 and v5 used a drop shadow that would break the GUI
-
-this version implements multiple 'dummy' pages
-'''
-
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
-from PyQt5.QtGui import QFont #imports font library
-from PyQt5.QtCore import Qt #class of 'Qt' is used for alignments
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
 
-class welcomeScreen(QWidget):
-  def __init__(self):
-    super().__init__()
-    self.setWindowTitle("PalletPortal 1.0")  #sets window title
-    self.setGeometry(0, 0, 1024, 600) #x, y, width, height; starting from the top left corner, the display is 1024x600 (7 inch screen)
-    
-    layout = QVBoxLayout()  #this class is used to construct vertical box layout objects
-    title = QLabel("Welcome")
-    title.setFont(QFont('Beausite Classic', 40)) #sets font type and size
-    title.setStyleSheet("color: #0c2340;"
-                        "background-color: #f15a22;"
-                        "font-weight: bold;") #this is in hexedecimal although you can put basic color names instead; css like properties; properties should end with ';'
-    title.setAlignment(Qt.AlignCenter) #aligns horizontally and vertically center
+'''screens'''
+class WelcomeScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        title = QLabel("Welcome")
+        title.setFont(QFont('Beausite Classic', 40))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
 
-    subtitle = QLabel("Insert flashdrive to begin")
-    subtitle.setFont(QFont('Beausite Classic', 20))
-    subtitle.setStyleSheet("color: #0c2340;"
-                        "background-color: #f15a22;"
-                        "font-weight: bold;")
-    subtitle.setAlignment(Qt.AlignCenter)
-    
-    
-    
-    layout.addWidget(title)
-    layout.addWidget(subtitle)
-    self.setLayout(layout)
+        subtitle = QLabel("Insert flashdrive to begin")
+        subtitle.setFont(QFont('Beausite Classic', 20))
+        subtitle.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        subtitle.setAlignment(Qt.AlignCenter)
+
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+        self.setLayout(layout)
+
+class selectModeScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        title = QLabel("Select Mode")
+        title.setFont(QFont('Beausite Classic', 40))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        subtitle = QLabel("Ship Mode | View Order")
+        subtitle.setFont(QFont('Beausite Classic', 20))
+        subtitle.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        subtitle.setAlignment(Qt.AlignCenter)
+        layout.addWidget(subtitle)
+
+        self.setLayout(layout)
+
+class shipModeScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        title = QLabel("Ship Mode")
+        title.setFont(QFont('Beausite Classic', 40))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        subtitle = QLabel("Progress Bar (coming soon)")
+        subtitle.setFont(QFont('Beausite Classic', 20))
+        subtitle.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        subtitle.setAlignment(Qt.AlignCenter)
+        layout.addWidget(subtitle)
+
+        self.setLayout(layout)
+
+class endScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        title = QLabel("Shipment Loaded")
+        title.setFont(QFont('Beausite Classic', 40))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        subtitle = QLabel("End of Process")
+        subtitle.setFont(QFont('Beausite Classic', 20))
+        subtitle.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        subtitle.setAlignment(Qt.AlignCenter)
+        layout.addWidget(subtitle)
+
+        self.setLayout(layout)
 
 
+'''main window with stacked screens'''
+class MainWindow(QStackedWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("PalletPortal 1.0")
+        self.setGeometry(0, 0, 1024, 600)
+
+        # Add screens to stack
+        self.screens = [WelcomeScreen(), selectModeScreen(), shipModeScreen(), endScreen()]
+        for screen in self.screens:
+            self.addWidget(screen)
+
+        self.currentIndex = 0
+        self.setCurrentIndex(self.currentIndex)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        modifiers = event.modifiers()
+
+        # Right keys: go forward
+        if key in [Qt.Key_V, Qt.Key_Return, Qt.Key_Enter]:
+            self.nextScreen()
+
+        # Left keys: go backward
+        if key in [Qt.Key_C, Qt.Key_Control]:
+            self.previousScreen()
+
+    def nextScreen(self):
+        if self.currentIndex < len(self.screens) - 1:
+            self.currentIndex += 1
+            self.setCurrentIndex(self.currentIndex)
+
+    def previousScreen(self):
+        if self.currentIndex > 0:
+            self.currentIndex -= 1
+            self.setCurrentIndex(self.currentIndex)
+
+
+'''GUI setup'''
 if __name__ == "__main__":
-  app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
-  window = welcomeScreen() #default behavior for a window is to hide it
-  window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
-  sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
