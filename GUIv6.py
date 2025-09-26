@@ -42,6 +42,6 @@ class welcomeScreen(QWidget):
 
 if __name__ == "__main__":
   app = QApplication(sys.argv) #sys.argv allows PyQt to pass any command line arguments
-  window = mainWindow() #default behavior for a window is to hide it
+  window = welcomeScreen() #default behavior for a window is to hide it
   window.show() #so this is why '.show' exists so that it can show; but the default behavior will only show it for a split second
   sys.exit(app.exec_()) #'app.exec_' method waits for user imput and handles events
