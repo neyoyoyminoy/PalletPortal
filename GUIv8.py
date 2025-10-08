@@ -1,3 +1,6 @@
+'''
+this is an iteration on version 7 but implements menu controls with four keys
+'''
 
 import os
 import re
