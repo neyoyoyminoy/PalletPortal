@@ -274,7 +274,7 @@ class PingWorker(QThread):
                         continue
                     dist_in = width_us / MB1040_US_PER_INCH
                     self.log.emit(f"Pin {p}: pulse {width_us:.1f} us (~{dist_in:.2f} in)")
-                   self.log.emit(f"Pin {p}: pulse {width_us:.1f} us (~{dist_in:.2f} in)")
+                    self.log.emit(f"Pin {p}: pulse {width_us:.1f} us (~{dist_in:.2f} in)")
                     # Trigger only if object is within 18 inches or closer
                     if dist_in <= 18:
                         self.ready.emit(dist_in, p)
