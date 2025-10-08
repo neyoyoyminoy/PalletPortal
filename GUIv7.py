@@ -1,4 +1,6 @@
-
+'''
+this is an iteration on verion 6 but the implements an automatic flashdrive reading for a file named barcodes.txt
+'''
 import os
 import re
 import sys
@@ -108,12 +110,12 @@ class WelcomeScreen(QWidget):
         title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
         layout.addWidget(title)
 
-        subtitle = QLabel("Insert flash drive with barcodes file to begin")
+        subtitle = QLabel("Insert flash drive to begin")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
 
-        self.status = QLabel("Waiting for USB...")
+        self.status = QLabel("Waiting for flashdrive...")
         self.status.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status)
 
@@ -154,13 +156,13 @@ class MainScreen(QWidget):
         self.setObjectName("MainScreen")
         layout = QVBoxLayout(self)
 
-        title = QLabel("Main / Ship Mode")
+        title = QLabel("Ship Mode")
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont("Beausite Classic", 36))
         title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
         layout.addWidget(title)
 
-        self.info = QLabel("No shipment loaded yet.")
+        self.info = QLabel("No shipment loaded yet")
         self.info.setAlignment(Qt.AlignCenter)
         self.info.setWordWrap(True)
         layout.addWidget(self.info)
