@@ -230,9 +230,10 @@ class MenuScreen(QWidget):
 
 # -------------------- Ship screen with ping sensor wait --------------------
 
+
 # Config: set your BOARD pin numbers here. Use one or two sensors.
-PING_PINS_BOARD = [15]      # e.g., single sensor on BOARD pin 15 (from your test)
-OPTIONAL_SECOND_PIN = None  # e.g., set to 16 (BOARD) if you add a second sensor
+PING_PINS_BOARD = [15, 32]   # two sensors
+DETECTION_THRESHOLD_IN = 18  # trigger when object ≤ 18 inches away
 # MB1040 scale factor (from your code): 147 us per inch
 MB1040_US_PER_INCH = 147.0
 
@@ -273,11 +274,13 @@ class PingWorker(QThread):
                         continue
                     dist_in = width_us / MB1040_US_PER_INCH
                     self.log.emit(f"Pin {p}: pulse {width_us:.1f} us (~{dist_in:.2f} in)")
-                    # Consider any positive pulse a success; you can add range checks here if needed
-                    if width_us > 0:
+                   self.log.emit(f"Pin {p}: pulse {width_us:.1f} us (~{dist_in:.2f} in)")
+                    # Trigger only if object is within 18 inches or closer
+                    if dist_in <= 18:
                         self.ready.emit(dist_in, p)
                         self._cleanup()
                         return
+
                 # brief pause between scans
                 time.sleep(0.01)
         except Exception as e:
