@@ -1,3 +1,5 @@
+import cv2
+
 def enhance(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8)).apply(gray)
@@ -25,4 +27,5 @@ while camera == True:
         cv2.putText(frame,myData,(pts2[0],pts2[1]),cv2.FONT_HERSHEY_SIMPLEX, 0.9,(255,0,255),2)
 
     cv2.imshow('Result',frame)
+
     cv2.waitKey(1)
