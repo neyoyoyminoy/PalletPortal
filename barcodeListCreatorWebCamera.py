@@ -16,7 +16,6 @@ cap.set(4,480) #picture height
 camera = True #simple flag to keep loop running
 
 while camera == True:
-
     success, frame = cap.read() #grabs a frame of the camera
 
     '''pyzbar returns a list of decoded objects'''
@@ -35,6 +34,7 @@ while camera == True:
     cv2.imshow('Result',frame) #shows the live view
 
     cv2.waitKey(1) #this should make it 1fps
+
 
 
 
