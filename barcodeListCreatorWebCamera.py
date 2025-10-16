@@ -1,4 +1,5 @@
 import cv2
+from pyzbar.pyzbar import decode
 
 def enhance(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -29,3 +30,4 @@ while camera == True:
     cv2.imshow('Result',frame)
 
     cv2.waitKey(1)
+
