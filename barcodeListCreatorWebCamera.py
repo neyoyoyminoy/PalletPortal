@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 from pyzbar.pyzbar import decode
 
 def enhance(img):
@@ -30,4 +31,5 @@ while camera == True:
     cv2.imshow('Result',frame)
 
     cv2.waitKey(1)
+
 
