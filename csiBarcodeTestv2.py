@@ -11,7 +11,7 @@ def gstreamer_pipeline(
     framerate=30, flip_method=0
 ):
     return (
-        "f"nvarguscamerasrc sensor-id={sensor_id}{mode} ! "
+        f"nvarguscamerasrc sensor-id={sensor_id}{mode} ! "
         f"video/x-raw(memory:NVMM), width=(int){capture_width}, height=(int){capture_height}, "
         f"framerate=(fraction){framerate}/1 ! "
         f"nvvidconv flip-method={flip_method} ! "
