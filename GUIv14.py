@@ -1,4 +1,6 @@
-
+'''
+this builds on top of GUIv11 but implements Joey's dual ultrasonic ping sensor code that avoids crosstalk
+'''
 import os
 import re
 import sys
@@ -138,12 +140,12 @@ class WelcomeScreen(QWidget):
         title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
         layout.addWidget(title)
 
-        subtitle = QLabel("Insert flash drive with barcodes file to begin")
+        subtitle = QLabel("Insert flash drive begin")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
 
-        self.status = QLabel("Waiting for USB...")
+        self.status = QLabel("Waiting for flashdrive...")
         self.status.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status)
 
@@ -239,7 +241,7 @@ class MenuScreen(QWidget):
 
 # Config: set your BOARD pin numbers here. Use one or two sensors.
 PING_PINS_BOARD = [15, 32]   # two sensors
-DETECTION_THRESHOLD_IN = 18  # trigger when object ≤ 18 inches away
+DETECTION_THRESHOLD_IN = 12  # trigger when object ≤ 12 inches away
 # MB1040 scale factor (from your code): 147 us per inch
 MB1040_US_PER_INCH = 147.0
 
@@ -408,7 +410,7 @@ class ViewOrderScreen(QWidget):
 class MainWindow(QStackedWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pallet Portal GUI (USB-gated + Menu + Ping)")
+        self.setWindowTitle("palletPortalv14 (crosstalk avoidance)")
         self.setMinimumSize(900, 600)
 
         self.welcome = WelcomeScreen()
