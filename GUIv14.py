@@ -240,7 +240,8 @@ class MenuScreen(QWidget):
 
 
 # Config: set your BOARD pin numbers here. Use one or two sensors.
-PING_PINS_BOARD = [15, 32]   # two sensors
+PING_PINS_BOARD = [15]   # two sensors
+OPTIONAL_SECOND_PIN = 32
 DETECTION_THRESHOLD_IN = 12  # trigger when object ≤ 12 inches away
 # MB1040 scale factor (from your code): 147 us per inch
 MB1040_US_PER_INCH = 147.0
