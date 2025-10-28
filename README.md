@@ -62,8 +62,9 @@ gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! 'video/x-raw(memory:NVMM),width=12
 ```
 
 ## Contributors
-- **Ed Strahle** — Lead Developer, Hardware Integration, GUI and System Design  
-- **Jim Yanney** — Physical Model Fabrication and Assembly  
+- **Brendan Nellis** — Lead Developer, Hardware Integration, GUI and System Design
+- **Simeon-Paul O'James** — Lead AI Model Developer, Hardware Integration
+- **Jose Escareno II** — Physical Model Fabrication and Assembly  
 - **Team Pallet Portal** — Electrical, Mechanical, and Software Support  
 
 ## License
