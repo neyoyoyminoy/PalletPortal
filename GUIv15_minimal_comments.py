@@ -13,15 +13,14 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget, QTextEdit
 )
 
-# --- GPIO (Jetson) ---
+#GPIO Jetson setup
 try:
     import Jetson.GPIO as GPIO
     GPIO_AVAILABLE = True
 except Exception:
     GPIO_AVAILABLE = False
 
-# -------------------- USB / barcodes gate (unchanged core) --------------------
-
+#automatic manifest read from USB flashdrive
 BARCODE_FILENAME_CANDIDATES = ["barcodes.txt", "shipment_barcodes.txt"]
 REQUIRED_COUNT = 10
 REQUIRED_LENGTH = 10
@@ -120,8 +119,7 @@ class USBWatcher(QObject):
                             self.status.emit(f"{found_name} at {dirpath} did not contain exactly {REQUIRED_COUNT} unique {REQUIRED_LENGTH}-digit barcodes.")
         self.status.emit("Scanning for USB + barcodes file...")
 
-# -------------------- Welcome + Menu --------------------
-
+#'welcome' screen and menu
 class WelcomeScreen(QWidget):
     proceed = pyqtSignal(ShipmentList, str)
 
@@ -231,10 +229,9 @@ class MenuScreen(QWidget):
             return
         super().keyPressEvent(event)
 
-# -------------------- Ship screen with ping sensor wait --------------------
-
-
-PING_PINS_BOARD = [15, 32]
+#ultrasonic ping sensor read
+PING_PINS_BOARD = [15]
+OPTIONAL_SECOND_PIN = 32
 DETECTION_THRESHOLD_IN = 18
 MB1040_US_PER_INCH = 147.0
 
@@ -273,7 +270,7 @@ class PingWorker(QThread):
         try:
             GPIO.setmode(GPIO.BOARD) #this follows nvidia jetson gpio docs
             for p in self.pins:
-                GPIO.setup(p, GPIO.IN) #this follows nvidia jetson gpio docs
+                GPIO.setup(p, GPIO.IN)
 
             self.log.emit(f"Starting ping initialization with crosstalk-safe alternation on pins (BOARD): {self.pins}")
             last_pin = None
@@ -320,11 +317,11 @@ class PingWorker(QThread):
     def _cleanup(self):
         if GPIO_AVAILABLE:
             try:
-                GPIO.cleanup() #this follows nvidia jetson gpio docs
+                GPIO.cleanup() #following nvidia jetson gpio docs
             except Exception:
                 pass
 
-    # --- Low-level pulse width sampling ---
+    #low level pulse width sampling
     def _measure_pw_us(self, pin: int, timeout_s: float = 0.06) -> Optional[float]:
         """
         Measure the pulse width (in microseconds) of one MB1040 echo.
@@ -418,8 +415,7 @@ class ViewOrderScreen(QWidget):
         title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
         layout.addWidget(title)
 
-# -------------------- Main window --------------------
-
+#main window
 class MainWindow(QStackedWidget):
     def __init__(self):
         super().__init__()
