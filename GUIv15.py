@@ -20,11 +20,10 @@ try:
 except Exception:
     GPIO_AVAILABLE = False
 
-# -------------------- USB / barcodes gate (unchanged core) --------------------
-
-BARCODE_FILENAME_CANDIDATES = ["barcodes.txt", "shipment_barcodes.txt"]
-REQUIRED_COUNT = 10
-REQUIRED_LENGTH = 10
+#manifest scan on flashdrive
+BARCODE_FILENAME_CANDIDATES = ["barcodes.txt"]
+REQUIRED_COUNT = 10 #this is not necessary but it helps for testing
+REQUIRED_LENGTH = 10 #again not necessary but it helped eliminate the automatic reading
 
 def guess_mount_roots():
     roots = set()
