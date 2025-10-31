@@ -1,6 +1,7 @@
 '''
 this version build on v14 to correct the crosstalk between the two ultrasonic ping sensors
 '''
+
 import os
 import re
 import sys
@@ -15,17 +16,16 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget, QTextEdit
 )
 
-# --- GPIO (Jetson) ---
+#---GPIO for the Jetson Orin Nano---
 try:
-    import Jetson.GPIO as GPIO
+    import Jetson.GPIO as GPIO #from nvidia jetson gpio docs
     GPIO_AVAILABLE = True
 except Exception:
     GPIO_AVAILABLE = False
 
-#manifest scan on flashdrive
-BARCODE_FILENAME_CANDIDATES = ["barcodes.txt"]
-REQUIRED_COUNT = 10 #this is not necessary but it helps for testing
-REQUIRED_LENGTH = 10 #again not necessary but it helped eliminate the automatic reading
+BARCODE_FILENAME_CANDIDATES = ["barcodes.txt"] #this looks for the manifest text file on the flashdrive
+REQUIRED_COUNT = 10 #this was just for testing count detection
+REQUIRED_LENGTH = 10 #helps avoid auto reads that arent real barcodes
 
 def guess_mount_roots():
     roots = set()
@@ -48,7 +48,7 @@ def guess_mount_roots():
         pass
     return [r for r in sorted(roots) if os.path.exists(r)]
 
-DEFAULT_MOUNT_ROOTS = guess_mount_roots()
+DEFAULT_MOUNT_ROOTS = guess_mount_roots() #this gets the possible usb mount points
 
 @dataclass
 class ShipmentList:
@@ -57,14 +57,11 @@ class ShipmentList:
 
     @staticmethod
     def parse(text: str):
-        # Remove UTF-8 BOM if present
         if text and text[0] == "\ufeff":
             text = text[1:]
 
-        # Find any 10-digit runs, regardless of separators
-        tokens = re.findall(r"(?<!\d)\d{10}(?!\d)", text)
+        tokens = re.findall(r"(?<!\d)\d{10}(?!\d)", text) #based on stackoverflow regex for grabbing 10-digit barcodes
 
-        # Keep first occurrence order, enforce uniqueness
         seen = set()
         unique_tokens = []
         for t in tokens:
@@ -76,13 +73,13 @@ class ShipmentList:
 
 
 class USBWatcher(QObject):
-    validListFound = pyqtSignal(ShipmentList, str)  # (shipment, mount_root)
+    validListFound = pyqtSignal(ShipmentList, str)
     status = pyqtSignal(str)
 
     def __init__(self, mount_roots=None, filename_candidates=None, poll_ms=1000, parent=None):
         super().__init__(parent)
         self.mount_roots = mount_roots or DEFAULT_MOUNT_ROOTS
-        self.filename_candidates = [c.lower() for c in (filename_candidates or BARCODE_FILENAME_CANDIDATES)]
+        self.filename_candidates = [c.lower() for c in (filename_candidates or BARCODE_FILENAME_CANDIDATES)] #this looks for the manifest text file on the flashdrive
         self.timer = QTimer(self)
         self.timer.setInterval(poll_ms)
         self.timer.timeout.connect(self.scan_once)
@@ -121,13 +118,12 @@ class USBWatcher(QObject):
                             self.validListFound.emit(parsed, dirpath)
                             return
                         else:
-                            self.status.emit(f"{found_name} at {dirpath} did not contain exactly {REQUIRED_COUNT} unique {REQUIRED_LENGTH}-digit barcodes.")
+                            self.status.emit(f"{found_name} at {dirpath} did not contain exactly {REQUIRED_COUNT} unique {REQUIRED_LENGTH}-digit barcodes.") #this was just for testing count detection
         self.status.emit("Scanning for USB + barcodes file...")
 
-# -------------------- Welcome + Menu --------------------
-
+# --------------------Welcome & Menu Screens--------------------
 class WelcomeScreen(QWidget):
-    proceed = pyqtSignal(ShipmentList, str)  # (shipment, mount_root)
+    proceed = pyqtSignal(ShipmentList, str)
 
     def __init__(self):
         super().__init__()
@@ -158,13 +154,13 @@ class WelcomeScreen(QWidget):
         hint.setAlignment(Qt.AlignCenter)
         layout.addWidget(hint)
 
-        self.watcher = USBWatcher()
+        self.watcher = USBWatcher() #creates the usb monitor for barcodes
         self.watcher.status.connect(self._on_status)
         self.watcher.validListFound.connect(self._on_valid)
-        self.watcher.start()
+        self.watcher.start() #starts watching for usb insert
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_R:
+        if event.key() == Qt.Key_R: #press r to manually rescan usb
             self._on_status("Manual rescan requested.")
             self.watcher.scan_once()
             event.accept()
@@ -180,7 +176,7 @@ class WelcomeScreen(QWidget):
         self.proceed.emit(shipment, root)
 
 
-class MenuScreen(QWidget):
+class MenuScreen(QWidget): #handles the menu input and navigation
     shipSelected = pyqtSignal()
     viewOrderSelected = pyqtSignal()
 
@@ -235,17 +231,13 @@ class MenuScreen(QWidget):
             return
         super().keyPressEvent(event)
 
-# -------------------- Ship screen with ping sensor wait --------------------
-
-
-# Config: set your BOARD pin numbers here. Use one or two sensors.
-PING_PINS_BOARD = [15, 32]   # two sensors
-DETECTION_THRESHOLD_IN = 18  # trigger when object ≤ 18 inches away
-# MB1040 scale factor (from your code): 147 us per inch
+# --------------------ship screen with ping sensor wait--------------------
+PING_PINS_BOARD = [15, 32]
+DETECTION_THRESHOLD_IN = 18
 MB1040_US_PER_INCH = 147.0
 
 
-class PingWorker(QThread):
+class PingWorker(QThread): #thread that reads ping sensors without crosstalk
     """
     Crosstalk-safe ultrasonic polling thread.
     - Alternates sensors with long settle time between switching (like jetson_ping_crosstalk).
@@ -254,7 +246,7 @@ class PingWorker(QThread):
     - Emits ready(distance_inches, pin_used) ONLY when distance <= DETECTION_THRESHOLD_IN.
     - Never returns after first reading; loops until stopped.
     """
-    ready = pyqtSignal(float, int)  # (distance_in_inches, pin_used)
+    ready = pyqtSignal(float, int)
     log = pyqtSignal(str)
 
     def __init__(self, pins_board: List[int]):
@@ -262,10 +254,9 @@ class PingWorker(QThread):
         self.pins = [p for p in pins_board if p is not None]
         self._stop = False
 
-        # timings chosen to mirror jetson_ping_crosstalk.py behavior
-        self.settle_time_s = 3.0   # long settle when switching sensors
-        self.quiet_time_s = 0.5    # short quiet between reads
-        self.samples = 7           # number of samples to average per read
+        self.settle_time_s = 3.0
+        self.quiet_time_s = 0.5
+        self.samples = 7
 
     def stop(self):
         self._stop = True
@@ -274,12 +265,11 @@ class PingWorker(QThread):
         if not GPIO_AVAILABLE:
             self.log.emit("GPIO not available; simulating sensor after 1s.")
             time.sleep(1.0)
-            # simulate far distance; will not trigger threshold
             self._emit_log_and_maybe_ready(24.0, -1)
             return
 
         try:
-            GPIO.setmode(GPIO.BOARD)
+            GPIO.setmode(GPIO.BOARD) #standard jetson gpio pin mode setup
             for p in self.pins:
                 GPIO.setup(p, GPIO.IN)
 
@@ -290,14 +280,12 @@ class PingWorker(QThread):
                     if self._stop:
                         break
 
-                    # Long settle if we switched sensors, to avoid crosstalk (mirrors reference script).
                     if last_pin is None or pin != last_pin:
                         self.log.emit(f"Reading sensor on pin {pin} (settle {self.settle_time_s:.1f}s)...")
                         self._sleep(self.settle_time_s)
                     else:
                         self.log.emit(f"Reading sensor on pin {pin}...")
 
-                    # Perform averaged read
                     dist_in = self._read_distance_in(pin, samples=self.samples)
 
                     if dist_in is not None:
@@ -307,7 +295,6 @@ class PingWorker(QThread):
                         self.log.emit(f"Pin {pin}: no valid reading (timeout / noise).")
 
                     last_pin = pin
-                    # Quiet time to allow echoes to dissipate before switching sensors
                     self._sleep(self.quiet_time_s)
 
         except Exception as e:
@@ -316,24 +303,22 @@ class PingWorker(QThread):
             self._cleanup()
 
     def _emit_log_and_maybe_ready(self, dist_in: float, pin: int):
-        # Trigger only if within configured threshold
         try:
             threshold = DETECTION_THRESHOLD_IN
         except NameError:
-            threshold = 18  # fallback if constant not present
+            threshold = 18
         if dist_in <= threshold:
-            self.ready.emit(dist_in, pin)
+            self.ready.emit(dist_in, pin) #sends signal when distance is under threshold
 
     def _sleep(self, seconds: float):
-        # cooperative sleep that respects stop flag
         end = time.time() + seconds
         while not self._stop and time.time() < end:
-            time.sleep(0.01)
+            time.sleep(0.01) #tiny delay to smooth readings
 
     def _cleanup(self):
         if GPIO_AVAILABLE:
             try:
-                GPIO.cleanup()
+                GPIO.cleanup() #cleanup per jetson gpio best practice
             except Exception:
                 pass
 
@@ -344,7 +329,6 @@ class PingWorker(QThread):
         Returns None on timeout.
         """
         start = time.time()
-        # Wait for line to go LOW then HIGH (begin pulse)
         while GPIO.input(pin) == GPIO.HIGH:
             if self._stop or (time.time() - start) > timeout_s:
                 return None
@@ -352,12 +336,11 @@ class PingWorker(QThread):
             if self._stop or (time.time() - start) > timeout_s:
                 return None
         rise = time.perf_counter()
-        # Wait for pulse to end
         while GPIO.input(pin) == GPIO.HIGH:
             if self._stop or (time.time() - start) > timeout_s:
                 return None
         fall = time.perf_counter()
-        return (fall - rise) * 1e6  # microseconds
+        return (fall - rise) * 1e6 #convert echo pulse to microseconds
 
     def _read_distance_in(self, pin: int, samples: int = 7) -> Optional[float]:
         pws = []
@@ -367,15 +350,14 @@ class PingWorker(QThread):
             pw = self._measure_pw_us(pin)
             if pw is None:
                 continue
-            dist_in = pw / MB1040_US_PER_INCH  # 147 µs per inch
+            dist_in = pw / MB1040_US_PER_INCH
             if 1.0 <= dist_in <= 300.0:
                 pws.append(dist_in)
-            time.sleep(0.01)
+            time.sleep(0.01) #tiny delay to smooth readings
 
         if not pws:
             return None
 
-        # Trim outliers similar to statistics.median-based approach
         pws.sort()
         if len(pws) >= 5:
             pws = pws[1:-1]
@@ -412,7 +394,7 @@ class ShipScreen(QWidget):
         self.log.append(msg)
 
     def _on_ready(self, dist_in: float, pin: int):
-        self.status.setText("CSI cameras are ready to use")
+        self.status.setText("CSI cameras are ready to use") #shows when sensors are ready
         self._log(f"Ready from pin {pin}, distance ~{dist_in:.2f} in")
 
     def closeEvent(self, e):
@@ -434,8 +416,7 @@ class ViewOrderScreen(QWidget):
         title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
         layout.addWidget(title)
 
-# -------------------- Main window --------------------
-
+# --------------------Main window--------------------
 class MainWindow(QStackedWidget):
     def __init__(self):
         super().__init__()
@@ -447,15 +428,15 @@ class MainWindow(QStackedWidget):
         self.ship = ShipScreen()
         self.view = ViewOrderScreen()
 
-        self.addWidget(self.welcome)  # 0
-        self.addWidget(self.menu)     # 1
-        self.addWidget(self.ship)     # 2
-        self.addWidget(self.view)     # 3
+        self.addWidget(self.welcome)
+        self.addWidget(self.menu)
+        self.addWidget(self.ship)
+        self.addWidget(self.view)
 
         self.setCurrentIndex(0)
         self.welcome.proceed.connect(self._unlock_to_menu)
-        self.menu.shipSelected.connect(lambda: self.setCurrentIndex(2))
-        self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3))
+        self.menu.shipSelected.connect(lambda: self.setCurrentIndex(2)) #goes to ship screen
+        self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3)) #goes to view order screen
 
     def _unlock_to_menu(self, shipment, source):
         self.expected_barcodes = shipment.barcodes
@@ -464,7 +445,7 @@ class MainWindow(QStackedWidget):
         self.menu.setFocus()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = MainWindow()
-    w.show()
-    sys.exit(app.exec_())
+    app = QApplication(sys.argv) #starts the qt app
+    w = MainWindow() #creates the main window
+    w.show() #shows the window
+    sys.exit(app.exec_()) #keeps the app running until closed
