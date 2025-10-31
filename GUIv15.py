@@ -1,4 +1,6 @@
-
+'''
+this version build on v14 to correct the crosstalk between the two ultrasonic ping sensors
+'''
 import os
 import re
 import sys
