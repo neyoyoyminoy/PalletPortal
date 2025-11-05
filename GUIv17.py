@@ -27,8 +27,6 @@ except Exception:
     GPIO_AVAILABLE = False
 
 BARCODE_FILENAME_CANDIDATES = ["barcodes.txt"]  #this looks for the manifest text file on the flashdrive
-REQUIRED_COUNT = 10  #this was just for testing count detection
-REQUIRED_LENGTH = 10  #helps avoid auto reads that arent real barcodes
 
 def guess_mount_roots():
     #this grabs common usb mount points on ubuntu/jetson
@@ -76,7 +74,7 @@ class ShipmentList:
                 seen.add(t)
                 unique_tokens.append(t)
 
-        return ShipmentList(unique_tokens) if len(unique_tokens) == REQUIRED_COUNT else None
+        return None
 
 # --------------------usb watcher--------------------
 class USBWatcher(QObject):
@@ -126,7 +124,7 @@ class USBWatcher(QObject):
                             self.validListFound.emit(parsed, dirpath)
                             return
                         else:
-                            self.status.emit(f"{found_name} at {dirpath} did not contain exactly {REQUIRED_COUNT} unique {REQUIRED_LENGTH}-digit barcodes.")  #this was just for testing count detection
+                            self.status.emit(f"{found_name} at {dirpath} did not contain correct manifest")  #this was just for testing count detection
         self.status.emit("scanning for usb + barcodes file...")
 
 # --------------------welcome & menu screens--------------------
@@ -240,9 +238,9 @@ class MenuScreen(QWidget):  #handles the menu input and navigation
 
 # ==================== dual ping worker (based on dual mb1040 script) ====================
 #this handles both mb1040 sensors alternating safely with smoothing
-#based on dual mb1040 script adapted from crosstalk_filteringv2
+#based on dual mb1040 script adapted from 'jetson_ping_crosstalk'
 class DualPingWorker(QThread):
-    ready = pyqtSignal(float, str)  # (avg_distance_in, "both")
+    ready = pyqtSignal(float, str)  #(avg_distance_in, "both")
     log = pyqtSignal(str)
 
     def __init__(self):
@@ -327,7 +325,7 @@ class DualPingWorker(QThread):
             GPIO.setup(SENSOR1_PIN, GPIO.IN)
             GPIO.setup(SENSOR2_PIN, GPIO.IN)
 
-            self.log.emit("alternating mb1040 readings every 3 s with soft lower limit smoothing...")  #based on dual mb1040 script
+            self.log.emit("alternating mb1040 readings every 3s with soft lower limit smoothing...")  #based on dual mb1040 script
             while not self._stop:
                 # --- sensor 1 ---
                 d1 = read_distance(SENSOR1_PIN, "sensor 1")
@@ -344,12 +342,9 @@ class DualPingWorker(QThread):
                 time.sleep(3.0)
 
                 # trigger when both are <= 13 in (soft min)
-                if d1 is not None and d2 is not None:
-                    if d1 <= SOFT_MIN_IN and d2 <= SOFT_MIN_IN:
-                        avg = (d1 + d2) / 2.0
-                        self.log.emit("both sensors < 13 in — ready to scan")  #based on dual mb1040 script behavior
-                        self.ready.emit(avg, "both")
-                        break
+                if d1 <= SOFT_MIN_IN or d2 <= SOFT_MIN_IN:
+                    self.log.emit("CSI cameras starting up")  #based on dual mb1040 script behavior
+                    break #this stops the ping sensors from printing anymore
 
         except Exception as e:
             self.log.emit(f"ping error: {e}")
@@ -669,7 +664,7 @@ class ViewOrderScreen(QWidget):
 class MainWindow(QStackedWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pallet Portal GUI (USB-gated + Menu + Dual Ping + CSI)")
+        self.setWindowTitle("palletPortal GUIv17")
         self.setMinimumSize(900, 600)
 
         self.welcome = WelcomeScreen()
