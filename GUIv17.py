@@ -615,7 +615,7 @@ class ShipScreen(QWidget):
             self._barcode_worker = BarcodeReaderWorker(
                 model_path="my_model.pt",   #this is the provided model filename
                 sensor_id=0,                #use cam0 default like teammate script #based on yolo_pillow_manifest.py args
-                width=1280, height=720, framerate=30,  #keep defaults
+                width=1280, height=720, framerate=30,  #keep defaults; 30fps was found not to be optimal
                 min_conf=0.25, iou=0.45, max_rois=6,  #same defaults
                 decode_every=1, fallback_interval=15,
                 manifest_codes=self._expected_codes
