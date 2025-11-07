@@ -540,7 +540,7 @@ class BarcodeReaderWorker(QThread):
                 rois = self._yolo_rois(model, img_rgb)
                 decoded = self._decode_from_rois(img_rgb, rois)
 
-                #full-frame fallback occasionally (based on yolo_pillow_manifest.py fallback_interval)
+                #full frame fallback occasionally (based on yolo_pillow_manifest.py fallback_interval)
                 if not decoded and self.fallback_interval > 0 and (frame_idx % self.fallback_interval == 0):
                     from PIL import ImageOps
                     from pyzbar.pyzbar import decode as zbar_decode
@@ -554,16 +554,16 @@ class BarcodeReaderWorker(QThread):
                             decoded.append(val)
 
                 if decoded:
-                    # report detections in requested phrasing
+                    #report detections in requested phrasing
                     for val in decoded:
                         self.decoded.emit(val)
                         rec, score, method = matcher.match(val)
                         if rec:
                             self.matched.emit(rec, score, method)
                             self._found.add(rec.strip())
-                            self.log.emit(f"{val} is loaded")
+                            self.log.emit(f"{val} is loaded") #barcode decoded and IS on shipping manifest
                         else:
-                            self.log.emit(f"{val} is not part of shipment")
+                            self.log.emit(f"{val} is not part of shipment") #barcode decoded but IS NOT on shipping manifest
 
                     #check completion
                     if expected_total and len(self._found) >= expected_total:
@@ -571,10 +571,10 @@ class BarcodeReaderWorker(QThread):
                         self.finished_all.emit()
                         break
                 else:
-                    # no decodes this pass → say it
-                    self.log.emit("no barcodes read")
+                    #no decodes this pass → say it
+                    self.log.emit("no barcodes read") #keeps an active feed for testing and visualization purposes
 
-                # enforce ~5 fps pacing
+                #enforce ~5 fps pacing
                 time.sleep(0.2)
 
         except Exception as e:
@@ -611,7 +611,7 @@ class ShipScreen(QWidget):
         self._expected_codes = []     #this will hold the manifest barcodes from usb
         self._barcode_worker = None   #this gets created after ping ready
 
-        # start the streamlined dual ping worker (either sensor under 13 in)
+        #start the streamlined dual ping worker (either sensor under 13 in)
         self.worker = DualPingWorker()
         self.worker.log.connect(self._log)
         self.worker.ready.connect(self._on_ready)
