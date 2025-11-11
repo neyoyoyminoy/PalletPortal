@@ -1,3 +1,8 @@
+'''
+this is a modified version of https://github.com/seitomatsubara/Jetson-nano-WS2812-LED-/blob/master/W2812.py
+
+it's modified so that 5 leds can be used which is what we have for our project
+'''
 import spidev
 import sys
  
