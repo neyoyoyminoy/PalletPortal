@@ -165,10 +165,20 @@ class SPItoWS:
             self.X = self.X[:base + i * 3] + pat + self.X[base + i * 3 + 3:]
 
     def LED_show(self):
-        Y = []
-        for i in range(self.led_count * 9):      #9 matches verified standalone test
-            Y.append(int(self.X[i * 8:(i + 1) * 8], 2))
-        self.spi.xfer3(Y, 2400000, 0, 8)
+    Y = []
+    total_bytes = self.led_count * 9
+    for i in range(total_bytes):
+        chunk = self.X[i * 8:(i + 1) * 8]
+        if len(chunk) == 8:
+            Y.append(int(chunk, 2))
+    if Y:
+        # pad a few zero bytes to ensure last leds latch
+        Y += [0x00] * 10
+        try:
+            self.spi.xfer3(Y, 2400000, 0, 8)
+        except Exception:
+            pass
+        time.sleep(0.00005)  # 50 µs reset gap
 
     def RGBto3Bytes(self, led_num, R, G, B):
         if any(v > 255 or v < 0 for v in (R, G, B)):
