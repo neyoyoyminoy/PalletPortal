@@ -375,7 +375,7 @@ class BarcodeReaderWorker(QThread):
     matched = pyqtSignal(str, int, str)  #value, score, method
     finished_all = pyqtSignal()    #this fires when all manifest barcodes are found
 
-    def __init__(self, model_path="my_model.pt", sensor_id=0, width=1280, height=720, framerate=5,
+    def __init__(self, model_path="my_model.pt", sensor_id=0, width=1920, height=1080, framerate=5,
                  min_conf=0.25, iou=0.45, max_rois=6, decode_every=1, fallback_interval=15,
                  manifest_codes=None):
         super().__init__()
@@ -635,7 +635,7 @@ class ShipScreen(QWidget):
             self._barcode_worker = BarcodeReaderWorker(
                 model_path="my_model.pt",   #this is the provided model filename
                 sensor_id=0,                #use cam0 default like teammate script #based on yolo_pillow_manifest.py args
-                width=1280, height=720, framerate=5,  #now 5 fps
+                width=1920, height=1080, framerate=5,  #now 5 fps
                 min_conf=0.25, iou=0.45, max_rois=6,  #same defaults
                 decode_every=1, fallback_interval=15,
                 manifest_codes=self._expected_codes
