@@ -686,7 +686,7 @@ class MainWindow(QStackedWidget):
         self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3))  #goes to view order screen
 
         #leds: one worker shared by all screens
-        self.leds = LEDWorker(num_leds=5, gpio_bcm=18, brightness=128)  #gpio_bcm=18 uses pwm; adjust if needed
+        self.leds = LEDWorker(num_leds=5, brightness=128)  #spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
         self.leds.start()
         self.leds.to_standby.emit()  #rainbow on startup
 
