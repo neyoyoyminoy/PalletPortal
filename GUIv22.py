@@ -159,7 +159,7 @@ class SPItoWS:
             pass
 
     def _Bytesto3Bytes(self, num, RGB):
-        base = num * 24
+        base = num * 9
         for i in range(8):
             pat = '100' if RGB[i] == '0' else '110'
             self.X = self.X[:base + i * 3] + pat + self.X[base + i * 3 + 3:]
@@ -393,7 +393,7 @@ class BarcodeReaderWorker(QThread):
     matched = pyqtSignal(str, int, str)  #value, score, method
     finished_all = pyqtSignal()    #this fires when all manifest barcodes are found
 
-    def __init__(self, model_path="my_model.pt", sensor_id=0, width=1280, height=720, framerate=5,
+    def __init__(self, model_path="my_model.pt", sensor_id=0, width=1920, height=1080, framerate=5,
                  min_conf=0.25, iou=0.45, max_rois=6, decode_every=1, fallback_interval=15,
                  manifest_codes=None):
         super().__init__()
@@ -653,7 +653,7 @@ class ShipScreen(QWidget):
             self._barcode_worker = BarcodeReaderWorker(
                 model_path="my_model.pt",   #this is the provided model filename
                 sensor_id=0,                #use cam0 default like teammate script #based on yolo_pillow_manifest.py args
-                width=1280, height=720, framerate=5,  #now 5 fps
+                width=1920, height=1080, framerate=5,  #now 5 fps
                 min_conf=0.25, iou=0.45, max_rois=6,  #same defaults
                 decode_every=1, fallback_interval=15,
                 manifest_codes=self._expected_codes
@@ -733,7 +733,7 @@ class MainWindow(QStackedWidget):
         self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3))  #goes to view order screen
 
         #leds: one worker shared by all screens
-        self.leds = LEDWorker(num_leds=5, brightness=128)  #spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
+        self.leds = LEDWorker(num_leds=5)  #spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
         self.leds.start()
         self.leds.to_standby.emit()  #rainbow on startup
 
