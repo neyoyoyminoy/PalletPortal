@@ -166,7 +166,7 @@ class SPItoWS:
 
     def LED_show(self):
         Y = []
-        for i in range(self.led_count * 24):
+        for i in range(self.led_count * 9):
             Y.append(int(self.X[i * 8:(i + 1) * 8], 2))
         self.spi.xfer3(Y, 2400000, 0, 8)
 
@@ -715,7 +715,7 @@ class MainWindow(QStackedWidget):
         self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3))  #goes to view order screen
 
         #leds: one worker shared by all screens
-        self.leds = LEDWorker(num_leds=5, brightness=128)  #spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
+        self.leds = LEDWorker(num_leds=5)  #spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
         self.leds.start()
         self.leds.to_standby.emit()  #rainbow on startup
 
