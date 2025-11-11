@@ -165,27 +165,26 @@ class SPItoWS:
             self.X = self.X[:base + i * 3] + pat + self.X[base + i * 3 + 3:]
 
     def LED_show(self):
-    Y = []
-    total_bytes = self.led_count * 9
-    for i in range(total_bytes):
-        chunk = self.X[i * 8:(i + 1) * 8]
-        if len(chunk) == 8:
-            Y.append(int(chunk, 2))
+        Y = []
+        total_bytes = self.led_count * 9
+        for i in range(total_bytes):
+            chunk = self.X[i * 8:(i + 1) * 8]
+            if len(chunk) == 8:
+                Y.append(int(chunk, 2))
+        if not Y:
+            return
 
-    if not Y:
-        return
+        # pad latch frame (extra zeros for reset)
+        Y += [0x00] * 80
 
-    # pad latch frame (extra zeros for reset)
-    Y += [0x00] * 80
-
-    try:
-        # split into smaller 256-byte writes to avoid driver truncation
-        step = 256
-        for i in range(0, len(Y), step):
-            self.spi.xfer3(Y[i:i + step], 1600000, 0, 8)
-        time.sleep(0.00008)  # 80 µs reset gap
-    except Exception as e:
-        print(f"[warn] spi transfer error: {e}")
+        try:
+            # split into smaller 256-byte writes to avoid driver truncation
+            step = 256
+            for i in range(0, len(Y), step):
+                 self.spi.xfer3(Y[i:i + step], 1600000, 0, 8)
+            time.sleep(0.00008)  # 80 µs reset gap
+        except Exception as e:
+            print(f"[warn] spi transfer error: {e}")
 
     def RGBto3Bytes(self, led_num, R, G, B):
         if any(v > 255 or v < 0 for v in (R, G, B)):
