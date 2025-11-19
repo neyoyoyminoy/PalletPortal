@@ -1,0 +1,860 @@
+'''
+guiv21.py
+verified spi-based ws2812 integration for 5 leds on pin 19 (spi0_mosi)
+based on https://github.com/seitomatsubara/Jetson-nano-WS2812-LED-/blob/master/W2812.py
+'''
+
+import os, re, sys, time
+from pathlib import Path
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget, QTextEdit
+import spidev
+import sys
+
+#---gpio availability check---
+try:
+    import Jetson.GPIO as _GPIO
+    GPIO_AVAILABLE = True
+except Exception:
+    GPIO_AVAILABLE = False
+
+BARCODE_FILENAME_CANDIDATES = ["barcodes.txt"]
+
+def guess_mount_roots():
+    roots=set()
+    user=os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    for base in ["/media","/mnt","/run/media"]:
+        roots.add(base)
+        if user: roots.add(os.path.join(base,user))
+    roots.add("/media/jetson")
+    try:
+        with open("/proc/mounts","r",encoding="utf-8",errors="ignore") as f:
+            for line in f:
+                p=line.split()
+                if len(p)>=3:
+                    mnt=p[1]; fstype=p[2].lower()
+                    if any(fs in fstype for fs in("vfat","exfat","ntfs","fuseblk")):
+                        roots.add(mnt)
+    except: pass
+    return [r for r in sorted(roots) if os.path.exists(r)]
+DEFAULT_MOUNT_ROOTS=guess_mount_roots()
+
+#--------------------shipment list parsing--------------------
+class ShipmentList:
+    #this just carries the list of barcodes from the text file
+    def __init__(self,barcodes): self.barcodes=barcodes
+    @staticmethod
+    def parse(text:str):
+        if text and text[0]=="\ufeff": text=text[1:]
+        parts=[t.strip() for t in re.split(r"[\s,]+",text) if t.strip()]
+        seen=set(); uniq=[]
+        for p in parts:
+            if p not in seen: seen.add(p); uniq.append(p)
+        return ShipmentList(uniq) if uniq else None
+
+#--------------------usb watcher--------------------
+class USBWatcher(QObject):
+    validListFound=pyqtSignal(ShipmentList,str)
+    status=pyqtSignal(str)
+    def __init__(self,mount_roots=None,filename_candidates=None,poll_ms=1000,parent=None):
+        super().__init__(parent)
+        self.mount_roots=mount_roots or DEFAULT_MOUNT_ROOTS
+        self.filename_candidates=[c.lower() for c in(filename_candidates or BARCODE_FILENAME_CANDIDATES)]
+        self.timer=QTimer(self); self.timer.setInterval(poll_ms)
+        self.timer.timeout.connect(self.scan_once)
+    def start(self): self.scan_once(); self.timer.start()
+    def stop(self): self.timer.stop()
+    def scan_once(self):
+        any_found=False
+        for root in self.mount_roots:
+            if not os.path.exists(root): continue
+            for dirpath,dirnames,filenames in os.walk(root):
+                depth=dirpath.strip(os.sep).count(os.sep)-root.strip(os.sep).count(os.sep)
+                if depth>2: dirnames[:]=[]; continue
+                if any(p in dirpath for p in("/proc","/sys","/dev","/run/lock")): continue
+                lower_files={fn.lower():fn for fn in filenames}
+                for cand_lower in self.filename_candidates:
+                    if cand_lower in lower_files:
+                        any_found=True
+                        found=lower_files[cand_lower]
+                        full=os.path.join(dirpath,found)
+                        try: txt=Path(full).read_text(encoding="utf-8",errors="ignore")
+                        except Exception as e:
+                            self.status.emit(f"found {found} at {dirpath}, but couldn't read: {e}")
+                            continue
+                        parsed=ShipmentList.parse(txt)
+                        if parsed:
+                            self.status.emit(f"valid list found at: {full}")
+                            self.validListFound.emit(parsed,dirpath)
+                            return
+                        else:
+                            self.status.emit(f"{found} at {dirpath} did not contain any readable barcodes")
+        if not any_found: self.status.emit("scanning for usb + barcodes file...")
+
+# --------------------welcome & menu screens--------------------
+class WelcomeScreen(QWidget):
+    proceed=pyqtSignal(ShipmentList,str)
+    def __init__(self):
+        super().__init__()
+        lay=QVBoxLayout(self)
+        t=QLabel("Welcome"); t.setAlignment(Qt.AlignCenter)
+        t.setFont(QFont("Beausite Classic",40))
+        t.setStyleSheet("color:#0c2340;background-color:#f15a22;font-weight:bold;")
+        lay.addWidget(t)
+        sub=QLabel("Insert flash drive with barcodes file to begin")
+        sub.setAlignment(Qt.AlignCenter); sub.setWordWrap(True); lay.addWidget(sub)
+        self.status=QLabel("Waiting for USB..."); self.status.setAlignment(Qt.AlignCenter); lay.addWidget(self.status)
+        self.debug=QTextEdit(); self.debug.setReadOnly(True); self.debug.setVisible(True); lay.addWidget(self.debug)
+        hint=QLabel("Press 'R' to force rescan. Looking under: "+", ".join(DEFAULT_MOUNT_ROOTS))
+        hint.setWordWrap(True); hint.setAlignment(Qt.AlignCenter); lay.addWidget(hint)
+        self.watcher=USBWatcher(); self.watcher.status.connect(self._on_status); self.watcher.validListFound.connect(self._on_valid)
+        self.watcher.start()
+    def keyPressEvent(self,e):
+        if e.key()==Qt.Key_R:
+            self._on_status("manual rescan requested."); self.watcher.scan_once(); e.accept(); return
+        super().keyPressEvent(e)
+    def _on_status(self,msg): self.status.setText(msg); self.debug.append(msg)
+    def _on_valid(self,shipment,root): self.watcher.stop(); self.proceed.emit(shipment,root)
+
+class MenuScreen(QWidget):
+    shipSelected=pyqtSignal(); viewOrderSelected=pyqtSignal()
+    def __init__(self):
+        super().__init__(); self.setFocusPolicy(Qt.StrongFocus)
+        self.opts=["Ship","View Order"]; self.idx=0
+        lay=QVBoxLayout(self)
+        t=QLabel("Menu"); t.setAlignment(Qt.AlignCenter); t.setFont(QFont("Beausite Classic",36))
+        t.setStyleSheet("color:#0c2340;background-color:#f15a22;font-weight:bold;"); lay.addWidget(t)
+        self.top=QLabel(self.opts[0]); self.bot=QLabel(self.opts[1])
+        for l in(self.top,self.bot): l.setAlignment(Qt.AlignCenter); l.setFont(QFont("Beausite Classic",32)); l.setMargin(12); lay.addWidget(l)
+        self._refresh()
+    def _refresh(self):
+        sel="border:4px solid #0c2340;border-radius:16px;"; norm="border:none;"
+        self.top.setStyleSheet(sel if self.idx==0 else norm)
+        self.bot.setStyleSheet(sel if self.idx==1 else norm)
+    def keyPressEvent(self,e):
+        k=e.key()
+        if k in(Qt.Key_Return,Qt.Key_Enter): self.idx=(self.idx-1)%2; self._refresh(); e.accept(); return
+        if k==Qt.Key_Control: self.idx=(self.idx+1)%2; self._refresh(); e.accept(); return
+        if k==Qt.Key_V:
+            (self.shipSelected if self.idx==0 else self.viewOrderSelected).emit(); e.accept(); return
+        super().keyPressEvent(e)
+
+#-------------------- ws2812 led strip (multi-SPI support) --------------------
+# based on https://github.com/seitomatsubara/Jetson-nano-WS2812-LED-/blob/master/W2812.py
+# note: enable spi0 and spi1 via jetson-io; pin19=spi0_mosi, pin37=spi1_mosi.
+# use a 330 Ω resistor in series with DIN and a 1000 µF cap across 5 V and GND.
+class SPItoWS:
+    def __init__(self, ledc=5, bus=0, device=0):
+        self.led_count = ledc
+        self.bus = bus
+        self.device = device
+        self.X = "100" * (self.led_count * 8 * 3)
+        self.spi = spidev.SpiDev()
+        self.spi.open(bus, device)           # <-- this is now selectable (0 or 1)
+        self.spi.max_speed_hz = 2400000
+        self.LED_OFF_ALL()
+
+    def __del__(self):
+        try:
+            self.spi.close()
+        except Exception:
+            pass
+
+    def _Bytesto3Bytes(self, num, RGB):
+        base = num * 24
+        for i in range(8):
+            pat = '100' if RGB[i] == '0' else '110'
+            self.X = self.X[:base + i * 3] + pat + self.X[base + i * 3 + 3:]
+
+    def LED_show(self):
+        Y = []
+        for i in range(self.led_count * 9):
+            Y.append(int(self.X[i * 8:(i + 1) * 8], 2))
+        self.spi.xfer3(Y, 2400000, 0, 8)
+
+    def RGBto3Bytes(self, led_num, R, G, B):
+        if any(v > 255 or v < 0 for v in (R, G, B)):
+            raise ValueError("invalid rgb value")
+        if led_num > self.led_count - 1:
+            raise ValueError("invalid led index")
+        RR, GG, BB = (format(R, '08b'), format(G, '08b'), format(B, '08b'))
+        self._Bytesto3Bytes(led_num * 3, GG)
+        self._Bytesto3Bytes(led_num * 3 + 1, RR)
+        self._Bytesto3Bytes(led_num * 3 + 2, BB)
+
+    def LED_OFF_ALL(self):
+        self.X = "100" * (self.led_count * 8 * 3)
+        self.LED_show()
+
+
+#-------------------- led worker (dual SPI strips) --------------------
+class LEDWorker(QThread):
+    to_standby = pyqtSignal()
+    to_green = pyqtSignal()
+    to_yellow_pulse = pyqtSignal()
+
+    def __init__(self, num_leds=5, parent=None):
+        super().__init__(parent)
+        # SPI0 -> pin 19 (enable via jetson-io)
+        self.strip0 = SPItoWS(num_leds, bus=0, device=0)
+        # SPI1 -> pin 37 (enable via jetson-io)
+        self.strip1 = SPItoWS(num_leds, bus=1, device=0)
+        self._mode = "standby"
+        self._stop = False
+        self.to_standby.connect(lambda: self._set_mode("standby"))
+        self.to_green.connect(lambda: self._set_mode("green"))
+        self.to_yellow_pulse.connect(lambda: self._set_mode("yellow_pulse"))
+
+    def stop(self):
+        self._stop = True
+
+    def _set_mode(self, m):
+        self._mode = m
+
+    def _rainbow_step(self, idx):
+        for i in range(self.strip0.led_count):
+            h = (idx + i * 60) % 360
+            r, g, b = self._hue_to_rgb(h)
+            self.strip0.RGBto3Bytes(i, r, g, b)
+            self.strip1.RGBto3Bytes(i, r, g, b)
+        self.strip0.LED_show()
+        self.strip1.LED_show()
+
+    def _hue_to_rgb(self, h):
+        h = h % 360
+        x = (1 - abs((h / 60) % 2 - 1)) * 255
+        if h < 60:   return (255, int(x), 0)
+        if h < 120:  return (int(x), 255, 0)
+        if h < 180:  return (0, 255, int(x))
+        if h < 240:  return (0, int(x), 255)
+        if h < 300:  return (int(x), 0, 255)
+        return (255, 0, int(x))
+
+    def run(self):
+        idx = 0
+        while not self._stop:
+            try:
+                if self._mode == "standby":
+                    self._rainbow_step(idx)
+                    self.msleep(50)
+
+                elif self._mode == "green":
+                    for i in range(self.strip0.led_count):
+                        self.strip0.RGBto3Bytes(i, 0, 150, 0)
+                        self.strip1.RGBto3Bytes(i, 0, 150, 0)
+                    self.strip0.LED_show()
+                    self.strip1.LED_show()
+                    self.msleep(150)
+
+                elif self._mode == "yellow_pulse":
+                    for _ in range(2):
+                        for i in range(self.strip0.led_count):
+                            self.strip0.RGBto3Bytes(i, 255, 160, 0)
+                            self.strip1.RGBto3Bytes(i, 255, 160, 0)
+                        self.strip0.LED_show()
+                        self.strip1.LED_show()
+                        self.msleep(120)
+                        self.strip0.LED_OFF_ALL()
+                        self.strip1.LED_OFF_ALL()
+                        self.msleep(120)
+                    self.msleep(600)
+
+                else:
+                    self.msleep(100)
+
+                idx = (idx + 5) % 360
+
+            except Exception:
+                self.msleep(200)
+
+        # turn off both strips on exit
+        try:
+            self.strip0.LED_OFF_ALL()
+            self.strip1.LED_OFF_ALL()
+        except Exception:
+            pass
+
+
+# ==================== dual ping worker (based on dual mb1040 script) ====================
+#this handles both mb1040 sensors alternating safely with smoothing
+#based on dual mb1040 script adapted from crosstalk_filteringv2
+# ==================== dual ping worker (simplified instantaneous readings) ====================
+class DualPingWorker(QThread):
+    ready = pyqtSignal(float, str)  # (avg_distance_in, "either")
+    log = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            import Jetson.GPIO as GPIO
+        except Exception as e:
+            self.log.emit(f"ping error: Jetson.GPIO not available: {e}")
+            return
+
+        import time
+
+        # --- Pin assignments (BOARD numbering) ---
+        SENSOR1_PIN = 15
+        SENSOR2_PIN = 32
+
+        # --- Sensor limits ---
+        HARD_MIN_IN = 6.0
+        MAX_IN = 254.0
+        TRIGGER_IN = 13.0  # start CSI when either ≤ 13 in
+
+        def measure_pulse(pin, timeout=0.05):
+            """Measure one PWM pulse width (µs) with timeout."""
+            if GPIO.wait_for_edge(pin, GPIO.RISING, timeout=int(timeout * 1000)) is None:
+                return None
+            start_ns = time.monotonic_ns()
+            if GPIO.wait_for_edge(pin, GPIO.FALLING, timeout=int(timeout * 1000)) is None:
+                return None
+            end_ns = time.monotonic_ns()
+            return (end_ns - start_ns) / 1000.0
+
+        def read_distance(pin, label):
+            """Read one instantaneous pulse and return distance in inches."""
+            width_us = measure_pulse(pin)
+            if width_us is None:
+                self.log.emit(f"{label} → no pulse detected")
+                return None
+            distance_in = width_us / 147.0
+            if not (HARD_MIN_IN <= distance_in <= MAX_IN):
+                self.log.emit(f"{label} → out of range ({distance_in:.2f} in)")
+                return None
+            distance_cm = distance_in * 2.54
+            self.log.emit(f"{label} → {distance_in:.2f} in ({distance_cm:.2f} cm)")
+            return distance_in
+
+        try:
+            GPIO.setmode(GPIO.BOARD)
+            GPIO.setup(SENSOR1_PIN, GPIO.IN)
+            GPIO.setup(SENSOR2_PIN, GPIO.IN)
+
+            self.log.emit("alternating MB1040 readings every 3 s (instantaneous mode)...")
+            while not self._stop:
+                d1 = read_distance(SENSOR1_PIN, "sensor 1")
+                time.sleep(0.1)  # crosstalk protection
+                d2 = read_distance(SENSOR2_PIN, "sensor 2")
+
+                if d1 is not None and d2 is not None:
+                    avg = (d1 + d2) / 2.0
+                    diff = d1 - d2
+                    self.log.emit(f"→ Fused Avg: {avg:.2f} in | Offset: {diff:.2f} in")
+                    if (d1 <= TRIGGER_IN) or (d2 <= TRIGGER_IN):
+                        self.log.emit("one sensor < 13 in — ready to scan")
+                        self.ready.emit(avg, "either")
+                        break
+                elif d1 is not None or d2 is not None:
+                    active = d1 if d1 is not None else d2
+                    self.log.emit(f"→ Single Sensor Active: {active:.2f} in")
+                    if active <= TRIGGER_IN:
+                        self.log.emit("single sensor < 13 in — ready to scan")
+                        self.ready.emit(active, "either")
+                        break
+                else:
+                    self.log.emit("→ both sensors out of range")
+
+                time.sleep(3.0)
+
+        except Exception as e:
+            self.log.emit(f"ping error: {e}")
+        finally:
+            try:
+                GPIO.cleanup()
+            except Exception:
+                pass
+            self.log.emit("ping gpio cleaned up")
+
+
+#------------------ embedded: simple manifest matcher --------------------
+#this wraps the usb-loaded barcodes into a simple matcher for exact checks
+#based on manifest_matcher.py ideas (load and case-insensitive lookup)
+class SimpleManifestMatcher:
+    #this keeps a set and a dict for quick exact matches
+    def __init__(self, codes):
+        self.codes = [str(c).strip() for c in (codes or []) if str(c).strip()]
+        # lower for lookup, keep original for echo
+        self._lut = {c.lower(): c for c in self.codes}  #based on manifest_matcher.py lookup map
+
+    def match(self, code: str):
+        if not code:
+            return None, 0, "none"
+        key = str(code).strip().lower()
+        if key in self._lut:
+            # exact match like teammate script prints
+            return self._lut[key], 100, "exact"  #based on manifest_matcher.py match()
+        return None, 0, "none"
+
+#--------------- embedded: csi camera barcode reader worker -------------------
+#this uses pillow + yolo + pyzbar + gstreamer to read barcodes from the csi cam
+#based on yolo_pillow_manifest.py functions and loop
+class BarcodeReaderWorker(QThread):
+    log = pyqtSignal(str)          #this shows in the ship screen debug box
+    decoded = pyqtSignal(str)      #this fires for every decoded barcode
+    matched = pyqtSignal(str, int, str)  #value, score, method
+    finished_all = pyqtSignal()    #this fires when all manifest barcodes are found
+
+    def __init__(self, model_path="my_model.pt", sensor_id=0, width=1920, height=1080, framerate=5,
+                 min_conf=0.25, iou=0.45, max_rois=6, decode_every=1, fallback_interval=15,
+                 manifest_codes=None):
+        super().__init__()
+        self.model_path = model_path
+        self.sensor_id = sensor_id
+        self.width = width
+        self.height = height
+        self.framerate = framerate  #now 5 fps
+        self.min_conf = min_conf
+        self.iou = iou
+        self.max_rois = max_rois
+        self.decode_every = decode_every
+        self.fallback_interval = fallback_interval
+        self._stop = False
+        self._manifest_codes = list(manifest_codes or [])
+        # this tracks matched codes until we hit all (per your request to stop when all found)
+        self._found = set()
+
+    def stop(self):
+        self._stop = True
+
+    # --- pipeline helpers (based on yolo_pillow_manifest.py lines ~30-60) ---
+    def _make_pipeline(self):
+        #this builds the gstreamer string for nvargus
+        #based on yolo_pillow_manifest.py make_pipeline()
+        return (
+            f"nvarguscamerasrc sensor-id={self.sensor_id} ! "
+            f"video/x-raw(memory:NVMM), width={self.width}, height={self.height}, framerate={self.framerate}/1 ! "
+            f"nvvidconv ! video/x-raw, format=BGRx ! "
+            f"videoconvert ! video/x-raw, format=BGR ! "
+            f"appsink name=sink emit-signals=false max-buffers=1 drop=true sync=false"
+        )
+
+    def _pull_frame(self, appsink):
+        #based on yolo_pillow_manifest.py pull_frame()
+        sample = appsink.emit("pull-sample")
+        if sample is None:
+            return None
+        buf = sample.get_buffer()
+        caps = sample.get_caps()
+        width = caps.get_structure(0).get_value("width")
+        height = caps.get_structure(0).get_value("height")
+        ok, map_info = buf.map(Gst.MapFlags.READ)
+        if not ok:
+            return None
+        try:
+            import numpy as np
+            frame = np.frombuffer(map_info.data, dtype=np.uint8).reshape((height, width, 3))
+            return frame
+        finally:
+            buf.unmap(map_info)
+
+    def _yolo_rois(self, model, img):
+        #based on yolo_pillow_manifest.py yolo_rois()
+        res = model.predict(img, conf=self.min_conf, iou=self.iou, verbose=False)
+        if not res or len(res) == 0 or res[0].boxes is None or res[0].boxes.xyxy is None:
+            return []
+        boxes = res[0].boxes
+        import numpy as np
+        xyxy = boxes.xyxy.cpu().numpy().astype(int)
+        if xyxy.size == 0:
+            return []
+        confs = boxes.conf.cpu().numpy() if boxes.conf is not None else np.ones((xyxy.shape[0],), dtype=float)
+        areas = (xyxy[:,2]-xyxy[:,0]) * (xyxy[:,3]-xyxy[:,1])
+        order = np.argsort(-(confs * (areas.clip(min=1))))
+        xyxy = xyxy[order][:self.max_rois]
+        out = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2 in xyxy]
+        return out
+
+    def _decode_from_rois(self, img_rgb, rois):
+        #based on yolo_pillow_manifest.py decode_from_rois()
+        from PIL import ImageOps
+        from pyzbar.pyzbar import decode as zbar_decode
+        out = []
+        for (x1, y1, x2, y2) in rois:
+            x1 = max(0, x1); y1 = max(0, y1); x2 = min(img_rgb.width, x2); y2 = min(img_rgb.height, y2)
+            if x2 <= x1 or y2 <= y1:
+                continue
+            crop = img_rgb.crop((x1, y1, x2, y2))
+            crop_gray = ImageOps.grayscale(crop)
+            res = zbar_decode(crop_gray)
+            for r in res:
+                try:
+                    val = r.data.decode('utf-8', errors='ignore')
+                except Exception:
+                    val = None
+                if val and val not in out:
+                    out.append(val)
+        return out
+
+    def run(self):
+        #lazy imports so the rest of the gui can still load on dev machines
+        #this mirrors teammate script pattern
+        try:
+            from ultralytics import YOLO  #based on yolo_pillow_manifest.py import
+            from PIL import Image         #we convert frames to pillow
+            import gi                     #gstreamer introspection
+            gi.require_version('Gst', '1.0')
+            from gi.repository import Gst
+            globals()['Gst'] = Gst  #stash for helpers
+        except Exception as e:
+            self.log.emit(f"[error] imports failed: {e} #based on yolo_pillow_manifest.py imports")
+            return
+
+        pipeline = None
+        try:
+            matcher = SimpleManifestMatcher(self._manifest_codes)  #this uses our usb-loaded list instead of auto
+            #start camera pipeline (based on yolo_pillow_manifest.py main() gst section)
+            Gst.init(None)
+            pipeline_str = self._make_pipeline()
+            pipeline = Gst.parse_launch(pipeline_str)
+            appsink = pipeline.get_by_name("sink")
+            if appsink is None:
+                self.log.emit("[error] appsink 'sink' not found #based on yolo_pillow_manifest.py")
+                return
+            pipeline.set_state(Gst.State.PLAYING)
+            self.log.emit("[info] csi pipeline started #based on yolo_pillow_manifest.py")
+
+            #load model (based on yolo_pillow_manifest.py model load)
+            self.log.emit(f"[info] loading yolo: {self.model_path}")
+            model = YOLO(self.model_path)
+
+            frame_idx = 0
+            expected_total = len(self._manifest_codes)
+            if expected_total == 0:
+                self.log.emit("[warn] no manifest barcodes loaded")
+            else:
+                self.log.emit(f"[info] expecting {expected_total} barcodes from manifest")
+
+            while not self._stop:
+                frame_bgr = self._pull_frame(appsink)
+                if frame_bgr is None:
+                    # still keep loop moving at ~5 fps
+                    time.sleep(0.2)
+                    self.log.emit("no barcodes read")
+                    continue
+
+                frame_idx += 1
+                if self.decode_every > 1 and (frame_idx % self.decode_every != 0):
+                    time.sleep(0.2)
+                    self.log.emit("no barcodes read")
+                    continue
+
+                #convert bgr to pillow rgb (based on yolo_pillow_manifest.py Image.fromarray usage)
+                img_rgb = Image.fromarray(frame_bgr[:, :, ::-1], mode="RGB")  #this converts bgr to rgb for pillow
+
+                rois = self._yolo_rois(model, img_rgb)
+                decoded = self._decode_from_rois(img_rgb, rois)
+
+                #full frame fallback occasionally (based on yolo_pillow_manifest.py fallback_interval)
+                if not decoded and self.fallback_interval > 0 and (frame_idx % self.fallback_interval == 0):
+                    from PIL import ImageOps
+                    from pyzbar.pyzbar import decode as zbar_decode
+                    ff_gray = ImageOps.grayscale(img_rgb)
+                    for r in zbar_decode(ff_gray):
+                        try:
+                            val = r.data.decode('utf-8', errors='ignore')
+                        except Exception:
+                            val = None
+                        if val and val not in decoded:
+                            decoded.append(val)
+
+                if decoded:
+                    #report detections in requested phrasing
+                    for val in decoded:
+                        self.decoded.emit(val)
+                        rec, score, method = matcher.match(val)
+                        if rec:
+                            self.matched.emit(rec, score, method)
+                            self._found.add(rec.strip())
+                            self.log.emit(f"{val} is loaded") #barcode decoded and IS on shipping manifest
+                        else:
+                            self.log.emit(f"{val} is not part of shipment") #barcode decoded but IS NOT on shipping manifest
+
+                    #check completion
+                    if expected_total and len(self._found) >= expected_total:
+                        self.log.emit("all barcodes found — scanning complete")
+                        self.finished_all.emit()
+                        break
+                else:
+                    #no decodes this pass → say it
+                    self.log.emit("no barcodes read") #keeps an active feed for testing and visualization purposes
+
+                #enforce ~5 fps pacing
+                time.sleep(0.2)
+
+        except Exception as e:
+            self.log.emit(f"[error] barcode reader crashed: {e}")
+
+        finally:
+            #stop pipeline when done
+            try:
+                if pipeline is not None:
+                    pipeline.set_state(Gst.State.NULL)
+            except Exception:
+                pass
+
+#--------------------ship screen (patched ping start/stop)--------------------
+class ShipScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("Ship")
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Beausite Classic", 36))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        layout.addWidget(title)
+
+        #get led worker from the main window
+        self._leds = None  #assigned in on_attach()
+
+        self.status = QLabel("Waiting for ping sensor...")
+        self.status.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.status)
+
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setVisible(True)  #keep visible
+        layout.addWidget(self.log)
+
+        self._expected_codes = []     #this will hold the manifest barcodes from usb
+        self._barcode_worker = None   #this gets created after ping ready
+        self._barcode_worker2 = None  # second camera worker
+
+        # ping worker is created lazily when the screen is shown
+        self.worker = None
+
+    def set_manifest_codes(self, codes):
+        #this gets called by mainwindow after usb watcher succeeds
+        self._expected_codes = list(codes or [])
+
+    def _log(self, msg: str):
+        self.log.append(msg)
+
+    def _on_ready(self, dist_in: float, label: str):
+        self.status.setText("CSI cameras are starting up...")  #requested wording
+
+        if self._leds:
+            self._leds.to_green.emit()  #turn on solid green when csi starts
+
+        self._log(f"sensor ready (~{dist_in:.2f} in avg) -> starting csi")
+
+        # start both barcode workers (camera 0 and camera 1) using the exact same pipeline/class
+        if self._barcode_worker is None:
+            self._barcode_worker = BarcodeReaderWorker(
+                model_path="my_model.pt",   #this is the provided model filename
+                sensor_id=0,                #use cam0
+                width=1920, height=1080, framerate=5,  #now 5 fps
+                min_conf=0.25, iou=0.45, max_rois=6,  #same defaults
+                decode_every=1, fallback_interval=15,
+                manifest_codes=self._expected_codes
+            )
+            self._barcode_worker.log.connect(self._log)
+            self._barcode_worker.matched.connect(lambda val, sc, m: self._on_match(val))
+            self._barcode_worker.decoded.connect(self._on_match)  # keep visibility for first-decode LED pulse
+            self._barcode_worker.finished_all.connect(self._on_all_done)
+            self._barcode_worker.start()
+
+        if self._barcode_worker2 is None:
+            self._barcode_worker2 = BarcodeReaderWorker(
+                model_path="my_model.pt",
+                sensor_id=1,                #second CSI camera
+                width=1920, height=1080, framerate=5,
+                min_conf=0.25, iou=0.45, max_rois=6,
+                decode_every=1, fallback_interval=15,
+                manifest_codes=self._expected_codes
+            )
+            self._barcode_worker2.log.connect(self._log)
+            self._barcode_worker2.matched.connect(lambda val, sc, m: self._on_match(val))
+            self._barcode_worker2.decoded.connect(self._on_match)  # keep visibility for first-decode LED pulse
+            self._barcode_worker2.finished_all.connect(self._on_all_done)
+            self._barcode_worker2.start()
+
+        # flash yellow on first decode then keep pulsing (connect to both decoded signals)
+        def _first_decode(_val):
+            if self._leds:
+                self._leds.to_yellow_pulse.emit()
+            # disconnect this one-shot from both workers
+            try:
+                if self._barcode_worker is not None:
+                    self._barcode_worker.decoded.disconnect(_first_decode)
+            except Exception:
+                pass
+            try:
+                if self._barcode_worker2 is not None:
+                    self._barcode_worker2.decoded.disconnect(_first_decode)
+            except Exception:
+                pass
+
+        # connect first-decode handler (if workers already exist they will connect safely)
+        try:
+            if self._barcode_worker is not None:
+                self._barcode_worker.decoded.connect(_first_decode)
+        except Exception:
+            pass
+        try:
+            if self._barcode_worker2 is not None:
+                self._barcode_worker2.decoded.connect(_first_decode)
+        except Exception:
+            pass
+
+    def _on_match(self, val):
+        # Called when either camera reports a match or a decoded value (we also use it to trigger LEDs)
+        self._log(f"{val} matched from one of the cameras")
+
+    def _on_all_done(self):
+        self.status.setText("all barcodes found — scanning complete")
+        #stop ping worker too since we are done
+        try:
+            self.stop_ping()
+        except Exception:
+            pass
+
+    def on_attach(self, main_window):
+        #this is called by main to wire shared services like leds
+        self._leds = getattr(main_window, "leds", None)
+
+    # ---- ping start/stop helpers ----
+    def start_ping(self):
+        """Create and start the DualPingWorker if not already running."""
+        if self.worker is not None and self.worker.isRunning():
+            return  # already running
+        try:
+            self.worker = DualPingWorker()
+            self.worker.log.connect(self._log)
+            self.worker.ready.connect(self._on_ready)
+            # keep a small log entry so user sees activity
+            self._log("ping worker starting...")
+            self.worker.start()
+        except Exception as e:
+            self._log(f"failed to start ping worker: {e}")
+            try:
+                if self.worker is not None:
+                    self.worker = None
+            except Exception:
+                pass
+
+    def stop_ping(self):
+        """Stop and cleanup the DualPingWorker if it exists."""
+        if self.worker is None:
+            return
+        try:
+            if self.worker.isRunning():
+                self._log("stopping ping worker...")
+                self.worker.stop()
+                # wait briefly for thread to finish
+                self.worker.wait(800)
+        except Exception as e:
+            self._log(f"error stopping ping worker: {e}")
+        finally:
+            try:
+                self.worker = None
+                self._log("ping worker stopped")
+            except Exception:
+                pass
+
+    # ---- ensure worker runs only while this screen is active ----
+    def showEvent(self, event):
+        super().showEvent(event)
+        # start ping readings when the Ship screen becomes visible/active
+        self.start_ping()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        # stop ping readings when leaving the Ship screen
+        self.stop_ping()
+
+    def closeEvent(self, e):
+        #stop threads on exit to prevent orphan processes
+        try:
+            self.stop_ping()
+        except Exception:
+            pass
+        # stop both barcode workers if running
+        for worker in (getattr(self, '_barcode_worker', None), getattr(self, '_barcode_worker2', None)):
+            try:
+                if worker and worker.isRunning():
+                    worker.stop()
+                    worker.wait(800)
+            except Exception:
+                pass
+        super().closeEvent(e)
+
+
+#--------------------view order screen--------------------
+class ViewOrderScreen(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("View Order")
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Beausite Classic", 36))
+        title.setStyleSheet("color: #0c2340; background-color: #f15a22; font-weight: bold;")
+        layout.addWidget(title)
+
+#--------------------main window--------------------
+class MainWindow(QStackedWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Pallet Portal GUI (USB-gated + Menu + Dual Ping + CSI)")
+        self.setMinimumSize(900, 600)
+
+        # --- initialize LED worker first ---
+        self.leds = LEDWorker(num_leds=5)  # spi0.0 uses pin 19 (spi0_mosi); enable via jetson-io
+        self.leds.start()
+        self.leds.to_standby.emit()  # rainbow on startup
+
+        # --- now create screens ---
+        self.welcome = WelcomeScreen()
+        self.menu = MenuScreen()
+        self.ship = ShipScreen()
+        self.ship.on_attach(self)  # now LEDs exist before this call
+        self.view = ViewOrderScreen()
+
+        # --- screen navigation ---
+        self.menu.viewOrderSelected.connect(lambda: self.leds.to_standby.emit())
+        self.menu.shipSelected.connect(lambda: None)  # ship will set its own LED mode
+
+        self.addWidget(self.welcome)
+        self.addWidget(self.menu)
+        self.addWidget(self.ship)
+        self.addWidget(self.view)
+
+        self.setCurrentIndex(0)
+
+        # --- connections ---
+        self.welcome.proceed.connect(self._unlock_to_menu)
+        self.menu.shipSelected.connect(lambda: self.setCurrentIndex(2))   # Ship screen
+        self.menu.viewOrderSelected.connect(lambda: self.setCurrentIndex(3))  # View Order screen
+
+    def _unlock_to_menu(self, shipment, source):
+        self.expected_barcodes = shipment.barcodes
+        self.ship_source = source
+        try:
+            self.ship.set_manifest_codes(self.expected_barcodes)  #hands the manifest to ship screen
+        except Exception:
+            pass
+        self.setCurrentIndex(1)
+        self.menu.setFocus()
+
+    def closeEvent(self, e):
+        try:
+            if hasattr(self, "leds") and self.leds.isRunning():
+                self.leds.stop()
+                self.leds.wait(800)
+        except Exception:
+            pass
+        super().closeEvent(e)
+
+#--------------------entry point--------------------
+if __name__ == "__main__":
+    app = QApplication(sys.argv)  #starts the qt app
+    w = MainWindow()  #creates the main window
+    w.show()  #shows the window
+    sys.exit(app.exec_())  #keeps the app running until closed
