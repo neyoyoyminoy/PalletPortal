@@ -1,49 +1,49 @@
 # Pallet Portal
 
-Pallet Portal is a dual-archway automated pallet scanning system designed to streamline outbound shipping operations by integrating barcode detection, object tracking, and manifest verification. It leverages the **NVIDIA Jetson Orin Nano**, custom 3D-printed hardware, and a Python-based graphical interface.
+Pallet Portal is a dual archway automated pallet scanning system designed to streamline outbound shipping operations by integrating barcode detection, object tracking, and manifest verification. It uses the **NVIDIA Jetson Orin Nano**, custom 3D printed hardware, and a Python based graphical interface.
 
 ## Overview
 - Dual IMX219 cameras for live barcode capture and object tracking.  
 - Integrated IR barcode scanner for redundancy and precision.  
 - Ultrasonic ping sensors for pallet presence detection and GUI activation.  
-- Custom PyQt GUI for real-time feedback, mode selection, and system status.  
-- Fully 3D-printed button interface and display housing, mounted on a dual-arch frame.
+- Custom PyQt GUI for real time feedback, mode selection, and system status.  
+- Fully 3D printed button interface and display housing, mounted on a dual arch frame.
 
 ## Features
-- Live dual-camera video feed via GStreamer pipeline.  
-- Barcode detection and comparison using Pillow / Pyzbar / ZXing.  
+- Live dual camera video feed via GStreamer pipeline.  
+- Barcode detection and comparison using Pillow/pyzbar/ZXing.  
 - Ultrasonic sensor input synchronized with GUI states to prevent crosstalk.  
 - Automatic USB manifest detection and reading.  
-- Hardware input mapped to GUI navigation (Down, Cancel, Select, Up).  
-- Custom layered button icons designed in Fusion 360 for tactile control.  
+- Hardware input mapped to GUI navigation (down, cancel, select, up).  
+- Custom layered button icons designed in Fusion for tactile control.  
 
 ## Hardware
 - Jetson Orin Nano Developer Kit  
 - Dual IMX219 Cameras  
 - Ultrasonic Ping Sensors (HC-SR04)  
 - IR Barcode Scanner  
-- 3D-Printed Components: Display enclosure, button case, dual-layer buttons, scaled pallet model (203 mm width)
+- 3D Printed Components: Display enclosure, button case, dual-layer buttons, scaled pallet model (203 mm width)
 
 ## Software Stack
 | Component | Description |
 |------------|-------------|
 | Python 3 | Main control and GUI logic |
-| PyQt5 / Pillow | GUI display and image processing |
+| PyQt5/Pillow | GUI display and image processing |
 | GStreamer | Real-time camera pipeline |
-| pyzbar / ZXing | Barcode decoding (OpenCV-free alternatives) |
-| GPIO / Jetson.GPIO | Peripheral communication |
+| pyzbar/ZXing | Barcode decoding (OpenCV-free alternatives) |
+| GPIO/Jetson.GPIO | Peripheral communication |
 | Threading | Dual-camera and sensor concurrency management |
 
 ## Current Focus
 - Refining UI housing and crossmember mounting.  
-- Transitioning from YOLO to Pillow-based lightweight detection.  
-- Optimizing IR-scanner and camera coordination to prevent redundant reads.  
+- Transitioning from YOLO to Pillow based lightweight detection.  
+- Optimizing IR scanner and camera coordination to prevent redundant reads.  
 - Improving print efficiency for long 3D jobs (>10 hours per iteration).  
 
 ## Known Issues
 - Occasional PyQt layout and event conflicts.  
-- Camera sensor-ID mismatches between CAM0 and CAM1.  
-- nvargus-daemon instability under high-load capture.  
+- Camera sensor ID mismatches between CAM0 and CAM1.  
+- nvargus daemon instability under high-load capture.  
 - Jetson thermal throttling during extended use.  
 - 3D print size limitations requiring segmented builds.  
 
