@@ -22,17 +22,17 @@ Pallet Portal is a dual archway automated pallet scanning system designed to str
 - Dual IMX219 Cameras  
 - Ultrasonic Ping Sensors (HC-SR04)  
 - IR Barcode Scanner  
-- 3D Printed Components: Display enclosure, button case, dual-layer buttons, scaled pallet model (203 mm width)
+- 3D Printed Components: Display enclosure, button case, dual layer buttons, scaled pallet model (203 mm width)
 
 ## Software Stack
 | Component | Description |
 |------------|-------------|
 | Python 3 | Main control and GUI logic |
 | PyQt5/Pillow | GUI display and image processing |
-| GStreamer | Real-time camera pipeline |
-| pyzbar/ZXing | Barcode decoding (OpenCV-free alternatives) |
+| GStreamer | Real time camera pipeline |
+| pyzbar/ZXing | Barcode decoding (OpenCV free alternatives) |
 | GPIO/Jetson.GPIO | Peripheral communication |
-| Threading | Dual-camera and sensor concurrency management |
+| Threading | Dual camera and sensor concurrency management |
 
 ## Current Focus
 - Refining UI housing and crossmember mounting.  
@@ -43,7 +43,7 @@ Pallet Portal is a dual archway automated pallet scanning system designed to str
 ## Known Issues
 - Occasional PyQt layout and event conflicts.  
 - Camera sensor ID mismatches between CAM0 and CAM1.  
-- nvargus daemon instability under high-load capture.  
+- nvargus daemon instability under high load capture.  
 - Jetson thermal throttling during extended use.  
 - 3D print size limitations requiring segmented builds.  
 
