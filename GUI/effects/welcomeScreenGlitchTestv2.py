@@ -1,116 +1,210 @@
-'''
+"""
 this is just a test to display 'welcome' and create a glitch effect like spiderman: into the spiderverse
 
-this iteration, I incorporated the dual LED strips to be synced with the update_glitch
-'''
+this version is standalone and runs a glitch text splash screen while syncing both ws2812 led strips over spi0 and spi1
+"""
+
+import sys  #import sys
+import random  #for glitch randomness
+import string  #for scramble characters
+import spidev  #spi driver on jetson
+from PyQt5.QtCore import Qt, QTimer  #qt core + timers
+from PyQt5.QtGui import QPainter, QColor, QFont  #drawing + fonts
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout  #basic widgets
 
 
-import sys
-import random
-import string
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainter, QColor, QFont
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from GUIv27 import SPItoWS   #this is to control the LEDs using my GUI class; both this file and the other have to be in the same location
+#-------------------- ws2812 led strip (spi) --------------------
+#based on your guiv21/guiv27 spitoWS class
+class SPItoWS:
+    def __init__(self, ledc=5, bus=0, device=0):
+        self.led_count = ledc  #number of leds in strip
+        self.bus = bus  #spi bus index
+        self.device = device  #spi device index
+        self.X = "100" * (self.led_count * 8 * 3)  #prebuild bit pattern buffer
+        self.spi = spidev.SpiDev()  #open spi device
+        self.spi.open(bus, device)  #open the selected spi bus/device
+        self.spi.max_speed_hz = 2400000  #spi clock
+        self.LED_OFF_ALL()  #start with strip off
 
-led = SPItoWS(ledc=5, bus=0, device=0)
+    def __del__(self):
+        try:
+            self.spi.close()  #close spi on exit
+        except Exception:
+            pass
 
+    def _Bytesto3Bytes(self, num, RGB):
+        base = num * 24  #each color byte becomes 24 bits in this encoding
+        for i in range(8):
+            pat = '100' if RGB[i] == '0' else '110'  #bit encoding for ws2812
+            self.X = self.X[:base + i * 3] + pat + self.X[base + i * 3 + 3:]
+
+    def LED_show(self):
+        Y = []  #this will hold the encoded bytes
+        for i in range(self.led_count * 9):
+            Y.append(int(self.X[i * 8:(i + 1) * 8], 2))
+        self.spi.xfer3(Y, 2400000, 0, 8)  #send buffer out via spi
+
+    def RGBto3Bytes(self, led_num, R, G, B):
+        if any(v > 255 or v < 0 for v in (R, G, B)):
+            raise ValueError("invalid rgb value")  #quick sanity check
+        if led_num > self.led_count - 1:
+            raise ValueError("invalid led index")
+        RR = format(R, '08b')  #red byte as bits
+        GG = format(G, '08b')  #green byte as bits
+        BB = format(B, '08b')  #blue byte as bits
+        self._Bytesto3Bytes(led_num * 3, GG)  #ws2812 expects grb order
+        self._Bytesto3Bytes(led_num * 3 + 1, RR)
+        self._Bytesto3Bytes(led_num * 3 + 2, BB)
+
+    def LED_OFF_ALL(self):
+        self.X = "100" * (self.led_count * 8 * 3)  #reset all encoded bits to "off"
+        self.LED_show()  #push off frame
+
+    def set_all(self, rgb):
+        r, g, b = rgb  #unpack rgb
+        for i in range(self.led_count):
+            self.RGBto3Bytes(i, r, g, b)  #write same color to each led
+        self.LED_show()  #update strip
+
+
+#-------------------- dual strip helper --------------------
+#this wraps two strips (spi0 + spi1) so glitch code only calls set_all()
+class DualStripDriver:
+    def __init__(self, num_leds=5):
+        self.strip0 = SPItoWS(num_leds, bus=0, device=0)  #pin 19 -> spi0_mosi
+        self.strip1 = SPItoWS(num_leds, bus=1, device=0)  #pin 37 -> spi1_mosi
+
+    def set_all(self, rgb):
+        r, g, b = rgb  #unpack rgb
+        for i in range(self.strip0.led_count):
+            self.strip0.RGBto3Bytes(i, r, g, b)
+            self.strip1.RGBto3Bytes(i, r, g, b)
+        self.strip0.LED_show()
+        self.strip1.LED_show()
+
+    def off(self):
+        try:
+            self.strip0.LED_OFF_ALL()
+        except Exception:
+            pass
+        try:
+            self.strip1.LED_OFF_ALL()
+        except Exception:
+            pass
+
+
+#-------------------- glitch text widget --------------------
 class GlitchText(QWidget):
     def __init__(self, text="WELCOME", led_driver=None):
         super().__init__()
-        self.text = text  #store text
-        self.scrambled = text  #scrambled frame
-        self.glitch_strength = 0  #glitch magnitude
-        self.led = led_driver  #store led driver for sync
+        self.text = text  #base text
+        self.scrambled = text  #current scrambled text
+        self.glitch_strength = 0  #how strong the current glitch frame is
+        self.led = led_driver  #dual strip driver
 
-        self.font = QFont("Arial", 72, QFont.Bold)  #big font
-        self.setStyleSheet("background-color: black;")  #black bg
+        self.font = QFont("Arial", 72, QFont.Bold)  #big bold font
+        self.setStyleSheet("background-color: black;")  #black background
 
-        self.timer = QTimer(self)  #glitch frame timer
-        self.timer.timeout.connect(self.update_glitch)  #update glitch frames
-        self.timer.start(60)  #16 fps
+        self.timer = QTimer(self)  #timer for driving glitch frames
+        self.timer.timeout.connect(self.update_glitch)  #hook to update method
+        self.timer.start(60)  #about ~16 fps
 
     def set_led_color(self, rgb):
         if not self.led:
-            return  #no leds hooked up
-        self.led.set_all(rgb)  #set entire strip
-        self.led.show()  #push to strip
+            return  #no leds provided
+        self.led.set_all(rgb)  #push color to both strips
 
     def update_glitch(self):
-        if random.random() < 0.35:  #glitch trigger chance
-            self.glitch_strength = random.randint(3, 12)  #offset amount
-            self.scramble()  #scramble chars
+        if random.random() < 0.35:  #random chance to enter glitch mode
+            self.glitch_strength = random.randint(3, 12)  #horizontal shift in px
+            self.scramble()  #scramble characters a bit
         else:
-            self.scrambled = self.text  #normal text
-            self.glitch_strength = 0  #no glitch
+            self.scrambled = self.text  #go back to clean text
+            self.glitch_strength = 0  #no shift
 
-        self.update()  #redraw frame
+        self.update()  #ask qt to repaint
 
     def scramble(self):
-        chars = list(self.text)  #to list
-        for i in range(len(chars)):  #loop chars
-            if random.random() < 0.25:  #25% scramble chance
+        chars = list(self.text)  #turn string into list for editing
+        for i in range(len(chars)):
+            if random.random() < 0.25:  #25% of chars get replaced
                 chars[i] = random.choice(string.ascii_uppercase + string.digits + "!@#$%*")
-        self.scrambled = "".join(chars)  #join back
+        self.scrambled = "".join(chars)  #back to string
 
     def paintEvent(self, e):
-        p = QPainter(self)  #main painter
-        p.setRenderHint(QPainter.TextAntialiasing)  #smooth text
-        p.setFont(self.font)  #set font
+        p = QPainter(self)  #qt painter
+        p.setRenderHint(QPainter.TextAntialiasing)  #smooth text edges
+        p.setFont(self.font)  #apply font
 
-        fm = self.fontMetrics()  #font measurements
+        fm = self.fontMetrics()  #font metrics for centering
         text_w = fm.horizontalAdvance(self.scrambled)  #text width
-        text_h = fm.ascent()  #vertical offset
+        text_h = fm.ascent()  #baseline to top
 
         x = (self.width() - text_w) // 2  #center x
         y = (self.height() + text_h) // 2  #center y
 
-        # BASE WHITE
-        p.setPen(QColor(255, 255, 255))  #white layer
-        p.drawText(x, y, self.scrambled)  #draw base
-        self.set_led_color((255, 255, 255))  #sync leds
+        # base white layer
+        p.setPen(QColor(255, 255, 255))  #white text
+        p.drawText(x, y, self.scrambled)  #draw main text
+        self.set_led_color((255, 255, 255))  #leds match base color
 
-        # GLITCH COLORS
+        # glitch overlays
         if self.glitch_strength > 0:
-            shift = self.glitch_strength  #how far layers shift
+            shift = self.glitch_strength  #horizontal displacement
 
-            # RED SHIFT
+            # red channel shift (left)
             p.setPen(QColor(255, 0, 0, 180))
             p.drawText(x - shift, y, self.scrambled)
-            self.set_led_color((255, 0, 0))
+            self.set_led_color((255, 0, 0))  #leds flash red with this frame
 
-            # CYAN SHIFT
+            # cyan channel shift (right)
             p.setPen(QColor(0, 255, 255, 180))
             p.drawText(x + shift, y, self.scrambled)
-            self.set_led_color((0, 255, 255))
+            self.set_led_color((0, 255, 255))  #leds flash cyan
 
-            # MAGENTA JITTER SLICE
+            # magenta jitter slice (random vertical offset)
             if random.random() < 0.4:
-                jitter_y = y + random.randint(-20, 20)
-                jitter_x = x + random.randint(-10, 10)
+                jitter_y = y + random.randint(-20, 20)  #small vertical jump
+                jitter_x = x + random.randint(-10, 10)  #small horizontal jitter
                 p.setPen(QColor(255, 0, 255, 200))
                 p.drawText(jitter_x, jitter_y, self.scrambled)
-                self.set_led_color((255, 0, 255))
+                self.set_led_color((255, 0, 255))  #leds flash magenta
 
+
+#-------------------- main window wrapper --------------------
 class DemoWindow(QWidget):
-    def __init__(self):
+    def __init__(self, led_driver=None):
         super().__init__()
-        self.setWindowTitle("glitch text test")  #window title
-        self.setStyleSheet("background-color: black;")  #black bg for whole window
+        self.setWindowTitle("welcome screen glitch test")  #window title
+        self.setStyleSheet("background-color: black;")  #black background
 
-        layout = QVBoxLayout()  #simple layout
-        layout.setContentsMargins(0, 0, 0, 0)  #remove padding
+        layout = QVBoxLayout()  #simple vertical layout
+        layout.setContentsMargins(0, 0, 0, 0)  #no padding
 
-        self.glitch = GlitchText("WELCOME", led_driver = led)
-        layout.addWidget(self.glitch)  #put in layout
+        self.glitch = GlitchText("WELCOME", led_driver=led_driver)  #glitch widget
+        layout.addWidget(self.glitch)  #add to layout
 
         self.setLayout(layout)  #apply layout
-        self.resize(900, 400)  #window size
+        self.resize(900, 400)  #starting window size
 
 
+#-------------------- entry point --------------------
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = DemoWindow()
-    w.show()
-    sys.exit(app.exec_()) 
+    leds = None  #placeholder so we can clean up on exit
+    try:
+        leds = DualStripDriver(num_leds=5)  #dual ws2812 strips on spi0 + spi1
+    except Exception as e:
+        print(f"led init failed: {e}")  #basic debug print if spi not ready
+        leds = None  #run gui anyway without leds
+
+    app = QApplication(sys.argv)  #start qt app
+    w = DemoWindow(led_driver=leds)  #pass leds into glitch window
+    w.show()  #show window
+
+    #hook app exit to turn off leds
+    if leds is not None:
+        app.aboutToQuit.connect(leds.off)  #make sure strips are cleared on close
+
+    sys.exit(app.exec_())  #qt event loop
+
 
