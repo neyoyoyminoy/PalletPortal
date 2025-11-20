@@ -10,12 +10,12 @@ Pallet Portal is a dual-archway automated pallet scanning system designed to str
 - Fully 3D-printed button interface and display housing, mounted on a dual-arch frame.
 
 ## Features
-✅ Live dual-camera video feed via GStreamer pipeline.  
-✅ Barcode detection and comparison using Pillow / Pyzbar / ZXing.  
-✅ Ultrasonic sensor input synchronized with GUI states to prevent crosstalk.  
-✅ Automatic USB manifest detection and reading.  
-✅ Hardware input mapped to GUI navigation (Down, Cancel, Select, Up).  
-✅ Custom layered button icons designed in Fusion 360 for tactile control.  
+- Live dual-camera video feed via GStreamer pipeline.  
+- Barcode detection and comparison using Pillow / Pyzbar / ZXing.  
+- Ultrasonic sensor input synchronized with GUI states to prevent crosstalk.  
+- Automatic USB manifest detection and reading.  
+- Hardware input mapped to GUI navigation (Down, Cancel, Select, Up).  
+- Custom layered button icons designed in Fusion 360 for tactile control.  
 
 ## Hardware
 - Jetson Orin Nano Developer Kit  
