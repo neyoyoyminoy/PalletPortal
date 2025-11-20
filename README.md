@@ -68,5 +68,5 @@ gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! 'video/x-raw(memory:NVMM),width=12
 - **Team Pallet Portal** — Electrical, Mechanical, and Software Support  
 
 ## License
-This project is for academic and research purposes under UTSA Senior Design — 2025.  
+This project is for academic and research purposes under UTSA Senior Design Fall 2025.  
 All code and designs are open for non-commercial educational use.
