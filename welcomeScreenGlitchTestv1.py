@@ -1,3 +1,6 @@
+'''
+this is just a test to display 'welcome' and create a glitch effect like spiderman: into the spiderverse
+'''
 import sys  #import sys
 import random  #import random
 import string  #import string
@@ -88,3 +91,4 @@ if __name__ == "__main__":
     w = DemoWindow()
     w.show()
     sys.exit(app.exec_()) 
+
