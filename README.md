@@ -57,7 +57,7 @@ pip install pillow pyzbar jetson-gpio
 
 python3 GUIv12.py
 
-# Optional single camera test
+#this is an optional single camera test; make sure to see current header pin configuration; there can only be sensor 1 and 2 from the 22 header pins
 gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! 'video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1' ! nvvidconv ! videoconvert ! xvimagesink
 ```
 
