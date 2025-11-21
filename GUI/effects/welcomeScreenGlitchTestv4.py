@@ -1,4 +1,6 @@
 """
+WARNING THIS IS A BROKEN VERSION
+
 this is just a test to display 'welcome' and create a glitch effect like spiderman: into the spiderverse
 
 this version is standalone and runs a glitch text splash screen while syncing both ws2812 led strips over spi0 and spi1
