@@ -9,7 +9,6 @@ from pathlib import Path
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QStackedWidget, QTextEdit, QListWidget, QListWidgetItem
-import spidev
 import sys
 
 class MenuScreen(QWidget):
