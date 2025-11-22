@@ -59,12 +59,12 @@ class BouncingLogo(QWidget):
         self.y = 50
 
         #random initial velocity (pixels per frame)
-        speed_min = 10.0
-        speed_max = 15.0
+        speed_min = 2.0
+        speed_max = 3.0
         self.dx = random.choice([-1, 1]) * random.uniform(speed_min, speed_max)
         self.dy = random.choice([-1, 1]) * random.uniform(speed_min, speed_max)
 
-        self.margin = 2  #soft margin from edges
+        self.margin = 0  #soft margin from edges
 
         self._pressed = set()  #tracks keys for exit combo
 
